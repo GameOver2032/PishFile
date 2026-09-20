@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- نشانه برنامه: ساختمان + برگه پیش‌فایل -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- ساختمان -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M30,44 L30,80 L58,80 L58,44 Z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M42,34 L42,44 L46,44 L46,34 Z" />
+
+    <!-- پنجره‌ها -->
+    <path
+        android:fillColor="#0E6F5C"
+        android:pathData="M35,50 h8 v7 h-8 z" />
+    <path
+        android:fillColor="#0E6F5C"
+        android:pathData="M47,50 h7 v7 h-7 z" />
+    <path
+        android:fillColor="#0E6F5C"
+        android:pathData="M35,62 h8 v7 h-8 z" />
+    <path
+        android:fillColor="#0E6F5C"
+        android:pathData="M47,62 h7 v7 h-7 z" />
+
+    <!-- برگه پیش‌فایل -->
+    <path
+        android:fillColor="#FFF6F8F6"
+        android:pathData="M60,38 L78,38 L86,46 L86,80 L60,80 Z" />
+    <path
+        android:fillColor="#B87E1E"
+        android:pathData="M78,38 L86,46 L78,46 Z" />
+
+    <!-- خطوط متن -->
+    <path
+        android:fillColor="#0E6F5C"
+        android:pathData="M64,52 h18 v3 h-18 z" />
+    <path
+        android:fillColor="#0E6F5C"
+        android:pathData="M64,60 h18 v3 h-18 z" />
+    <path
+        android:fillColor="#B87E1E"
+        android:pathData="M64,68 h11 v4 h-11 z" />
+</vector>
