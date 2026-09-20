@@ -14,18 +14,19 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -39,33 +40,29 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ir.pishfile.app.core.Constants
 import ir.pishfile.app.core.Formatters
-import ir.pishfile.app.data.local.entity.InstallmentEntity
 import ir.pishfile.app.data.local.entity.PreFileEntity
 import ir.pishfile.app.ui.AppViewModelProvider
 import ir.pishfile.app.ui.components.ConfirmDialog
 import ir.pishfile.app.ui.components.DropdownField
 import ir.pishfile.app.ui.components.EmptyState
 import ir.pishfile.app.ui.components.FilterChipsRow
-import ir.pishfile.app.ui.components.FinanceCard
 import ir.pishfile.app.ui.components.FormTextField
 import ir.pishfile.app.ui.components.InfoRow
 import ir.pishfile.app.ui.components.JalaliDateField
 import ir.pishfile.app.ui.components.MoneyField
 import ir.pishfile.app.ui.components.NumberField
-import ir.pishfile.app.ui.components.PaymentProgress
 import ir.pishfile.app.ui.components.SearchField
 import ir.pishfile.app.ui.components.SectionCard
-import ir.pishfile.app.ui.components.SoftDivider
 import ir.pishfile.app.ui.components.SpacerH
 import ir.pishfile.app.ui.components.StatusChip
-import ir.pishfile.app.ui.screens.dashboard.installmentStatusColor
 import ir.pishfile.app.ui.screens.dashboard.preFileStatusColor
-import ir.pishfile.app.ui.theme.StatusColors
 import ir.pishfile.app.ui.viewmodel.PreFileDetailViewModel
 import ir.pishfile.app.ui.viewmodel.PreFileEditViewModel
-import ir.pishfile.app.ui.viewmodel.PreFileForm
 import ir.pishfile.app.ui.viewmodel.PreFileListViewModel
 
+/**
+ * فهرست فایل‌های پیش‌فروش
+ */
 @Composable
 fun PreFileListScreen(
     onOpen: (String) -> Unit,
@@ -84,7 +81,7 @@ fun PreFileListScreen(
                 query = it
                 viewModel.setQuery(it)
             },
-            placeholder = "شماره پیش‌فایل، مشتری، پروژه، واحد…",
+            placeholder = "جست‌وجوی پیش‌فروش: شماره فایل، مالک، پروژه، واحد…",
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
         )
 
@@ -100,8 +97,8 @@ fun PreFileListScreen(
 
         if (preFiles.isEmpty()) {
             EmptyState(
-                title = "پیش‌فایلی ثبت نشده",
-                subtitle = "با دکمه + یک پیش‌فایل جدید بسازید؛ شماره‌ی پیش‌فایل و جدول اقساط خودکار ساخته می‌شود",
+                title = "فایل پیش‌فروشی ثبت نشده",
+                subtitle = "با دکمه + یک فایل پیش‌فروش جدید اضافه کنید",
                 icon = { Icon(Icons.Filled.Description, contentDescription = null) },
             )
         } else {
@@ -122,8 +119,8 @@ fun PreFileListScreen(
 
     pendingDelete?.let { preFile ->
         ConfirmDialog(
-            title = "حذف پیش‌فایل",
-            message = "پیش‌فایل ${preFile.draftNumber} و اقساط آن حذف می‌شوند.",
+            title = "حذف فایل پیش‌فروش",
+            message = "فایل ${preFile.draftNumber} حذف شود؟",
             onConfirm = { viewModel.delete(preFile.id) },
             onDismiss = { pendingDelete = null },
         )
@@ -147,13 +144,16 @@ private fun PreFileCard(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(
-                        "${preFile.draftNumber} • ${row.customerName ?: "بدون مشتری"}",
+                        "${preFile.draftNumber} • ${row.projectName ?: "پروژه"}",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
                     )
                     Text(
-                        listOfNotNull(row.projectName, row.unitTitle, Formatters.toPersianDigits(preFile.draftDate))
-                            .joinToString(" • "),
+                        listOfNotNull(
+                            row.unitTitle,
+                            preFile.ownerName?.let { "مالک: $it" },
+                            Formatters.toPersianDigits(preFile.draftDate)
+                        ).joinToString(" • "),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -163,80 +163,103 @@ private fun PreFileCard(
                     Icon(Icons.Filled.Delete, contentDescription = "حذف", tint = MaterialTheme.colorScheme.error)
                 }
             }
-            SpacerH(8)
+
+            SpacerH(6)
+
+            // نمایش بر اساس مدل قیمت‌گذاری
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                when (preFile.pricingModel) {
+                    Constants.PRICING_DEPOSIT_BONUS -> {
+                        Text(
+                            "واریزی: ${Formatters.amountShort(preFile.depositAmount)} | امتیاز: ${Formatters.amountShort(preFile.bonusAmount)}",
+                            style = MaterialTheme.typography.labelSmall,
+                        )
+                        Text(
+                            "مجموع: ${Formatters.amountShort(preFile.computedTotal)} تومان",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                    Constants.PRICING_SHARE -> {
+                        Text(
+                            "${Formatters.number(preFile.shareCount)} سهم (${Formatters.number(preFile.shareMeterArea?.toInt())} متری)",
+                            style = MaterialTheme.typography.labelSmall,
+                        )
+                        Text(
+                            "کل: ${Formatters.amountShort(preFile.computedTotal)} تومان",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                    else -> { // METER
+                        Text(
+                            "متراژ: ${Formatters.number(preFile.meterArea?.toInt())} م² • متری ${Formatters.amountShort(preFile.pricePerMeter)}",
+                            style = MaterialTheme.typography.labelSmall,
+                        )
+                        Text(
+                            "قیمت: ${Formatters.amountShort(preFile.displayPrice)} تومان",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                }
+            }
+
+            SpacerH(4)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(
-                    "مبلغ کل: ${Formatters.amountShort(preFile.effectivePrice)} تومان",
-                    style = MaterialTheme.typography.labelMedium,
+                    "شرایط: ${preFile.saleConditionsSummary}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Text(
-                    "مانده: ${Formatters.amountShort(preFile.dueAmount)} تومان",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = if (preFile.dueAmount > 0) StatusColors.reserved else StatusColors.paid,
-                )
+                if (preFile.hasRanking && !preFile.ranking.isNullOrBlank()) {
+                    Text(
+                        "رتبه: ${preFile.ranking}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.secondary,
+                    )
+                }
             }
-            SpacerH(6)
-            PaymentProgress(paid = preFile.paidAmount, total = preFile.effectivePrice)
         }
     }
 }
 
+/**
+ * فرم ثبت / ویرایش فایل پیش‌فروش
+ */
 @Composable
 fun PreFileEditScreen(
     preFileId: String?,
     initialProjectId: String,
     initialUnitId: String,
-    initialCustomerId: String,
     onBack: () -> Unit,
     onSaved: (String) -> Unit,
     viewModel: PreFileEditViewModel = viewModel(factory = AppViewModelProvider.Factory),
 ) {
     if (preFileId == null) {
-        viewModel.startNew(initialProjectId, initialUnitId, initialCustomerId)
+        viewModel.startNew(initialProjectId, initialUnitId)
     } else {
         viewModel.load(preFileId)
     }
 
     val form = viewModel.form
     val projects = viewModel.projects
-    val customers = viewModel.customers
     val units = viewModel.availableUnits
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
+        // --- ۱) پروژه و واحد ---
         item {
             SectionCard(
-                title = "شناسه پیش‌فایل",
-                subtitle = "شماره به‌صورت خودکار ساخته می‌شود",
+                title = "پروژه و واحد",
+                subtitle = "با انتخاب پروژه، شرایط اختصاصی آن به‌صورت خودکار پر می‌شود",
             ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FormTextField(
-                        value = Formatters.toPersianDigits(form.draftNumber),
-                        onValueChange = { v -> viewModel.update { it.copy(draftNumber = Formatters.toLatinDigits(v)) } },
-                        label = "شماره پیش‌فایل",
-                        modifier = Modifier.weight(1f),
-                    )
-                    FormTextField(
-                        value = form.trackingCode,
-                        onValueChange = { v -> viewModel.update { it.copy(trackingCode = v) } },
-                        label = "کد رزرو",
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-                SpacerH(8)
-                JalaliDateField(
-                    value = form.draftDate,
-                    onValueChange = { v -> viewModel.update { it.copy(draftDate = v) } },
-                    label = "تاریخ تنظیم",
-                    quickMonths = emptyList(),
-                )
-            }
-        }
-
-        item {
-            SectionCard(title = "پروژه و واحد") {
                 DropdownField(
                     label = "پروژه *",
                     options = projects.map { it.name },
@@ -248,102 +271,254 @@ fun PreFileEditScreen(
                 SpacerH(8)
                 DropdownField(
                     label = "واحد",
-                    options = units.map { "${it.displayTitle} — ${Formatters.amountShort(it.finalPrice ?: it.totalPrice)} تومان" },
-                    selected = units.firstOrNull { it.id == form.unitId }
-                        ?.let { "${it.displayTitle} — ${Formatters.amountShort(it.finalPrice ?: it.totalPrice)} تومان" },
-                    onSelect = { label ->
-                        units.firstOrNull {
-                            "${it.displayTitle} — ${Formatters.amountShort(it.finalPrice ?: it.totalPrice)} تومان" == label
-                        }?.let { viewModel.selectUnit(it.id) }
+                    options = units.map { it.displayTitle },
+                    selected = units.firstOrNull { it.id == form.unitId }?.displayTitle,
+                    onSelect = { title ->
+                        units.firstOrNull { it.displayTitle == title }?.let { viewModel.selectUnit(it.id) }
                     },
-                    emptyLabel = "بدون واحد",
+                    emptyLabel = "بدون واحد مشخص",
                     allowEmpty = true,
-                )
-                SpacerH(6)
-                if (units.isEmpty()) {
-                    Text(
-                        "برای این پروژه واحدی ثبت نشده — ابتدا واحدها را بسازید",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                }
-            }
-        }
-
-        item {
-            SectionCard(title = "مشتری") {
-                DropdownField(
-                    label = "مشتری *",
-                    options = customers.map { "${it.firstName} ${it.lastName} — ${it.phonePrimary ?: ""}" },
-                    selected = customers.firstOrNull { it.id == form.customerId }
-                        ?.let { "${it.firstName} ${it.lastName} — ${it.phonePrimary ?: ""}" },
-                    onSelect = { label ->
-                        customers.firstOrNull {
-                            "${it.firstName} ${it.lastName} — ${it.phonePrimary ?: ""}" == label
-                        }?.let { viewModel.update { f -> f.copy(customerId = it.id) } }
-                    },
                 )
                 SpacerH(8)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FormTextField(
-                        value = form.salesAgentName,
-                        onValueChange = { v -> viewModel.update { it.copy(salesAgentName = v) } },
-                        label = "کارشناس فروش",
+                        value = form.draftNumber,
+                        onValueChange = { v -> viewModel.update { it.copy(draftNumber = v) } },
+                        label = "شماره فایل",
                         modifier = Modifier.weight(1f),
                     )
-                    FormTextField(
-                        value = form.salesAgentPhone,
-                        onValueChange = { v -> viewModel.update { it.copy(salesAgentPhone = v) } },
-                        label = "تلفن کارشناس",
+                    JalaliDateField(
+                        value = form.draftDate,
+                        onValueChange = { v -> viewModel.update { it.copy(draftDate = v) } },
+                        label = "تاریخ ثبت",
+                        quickMonths = emptyList(),
                         modifier = Modifier.weight(1f),
                     )
                 }
             }
         }
 
+        // --- ۲) سپارنده / مالک فایل ---
         item {
-            SectionCard(title = "شرایط مالی") {
-                MoneyField(
-                    value = form.pricePerMeter,
-                    onValueChange = { v -> viewModel.update { it.copy(pricePerMeter = v) } },
-                    label = "قیمت هر مترمربع",
-                )
-                SpacerH(8)
-                MoneyField(
-                    value = form.totalPrice,
-                    onValueChange = { v -> viewModel.update { it.copy(totalPrice = v) } },
-                    label = "مبلغ کل",
-                )
-                SpacerH(8)
-                MoneyField(
-                    value = form.discount,
-                    onValueChange = { v -> viewModel.update { it.copy(discount = v) } },
-                    label = "تخفیف",
-                )
-                SpacerH(8)
-                MoneyField(
-                    value = form.prepayment,
-                    onValueChange = { v -> viewModel.update { it.copy(prepayment = v) } },
-                    label = "پیش‌پرداخت",
-                )
+            SectionCard(title = "مشخصات مالک / سپارنده فایل") {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FormTextField(
+                        value = form.ownerName,
+                        onValueChange = { v -> viewModel.update { it.copy(ownerName = v) } },
+                        label = "نام مالک / سپارنده",
+                        modifier = Modifier.weight(1f),
+                    )
+                    FormTextField(
+                        value = form.ownerPhone,
+                        onValueChange = { v -> viewModel.update { it.copy(ownerPhone = v) } },
+                        label = "شماره تماس",
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
+        }
+
+        // --- ۳) مدل قیمت‌گذاری و ارقام مالی ---
+        item {
+            SectionCard(
+                title = "مدل قیمت‌گذاری و قیمت فایل",
+                subtitle = "یکی از ۳ مدل زیر را انتخاب کنید:",
+            ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    FilterChip(
+                        selected = form.pricingModel == Constants.PRICING_DEPOSIT_BONUS,
+                        onClick = { viewModel.update { it.copy(pricingModel = Constants.PRICING_DEPOSIT_BONUS) } },
+                        label = { Text("واریزی و امتیاز") },
+                    )
+                    FilterChip(
+                        selected = form.pricingModel == Constants.PRICING_METER,
+                        onClick = { viewModel.update { it.copy(pricingModel = Constants.PRICING_METER) } },
+                        label = { Text("قیمت متری") },
+                    )
+                    FilterChip(
+                        selected = form.pricingModel == Constants.PRICING_SHARE,
+                        onClick = { viewModel.update { it.copy(pricingModel = Constants.PRICING_SHARE) } },
+                        label = { Text("سهامی") },
+                    )
+                }
+
                 SpacerH(10)
-                FinanceCard(
-                    title = "مبلغ نهایی پس از تخفیف",
-                    amount = Formatters.amountWithUnit(form.finalPriceValue),
-                    color = MaterialTheme.colorScheme.primary,
-                )
+
+                when (form.pricingModel) {
+                    Constants.PRICING_DEPOSIT_BONUS -> {
+                        MoneyField(
+                            value = form.depositAmount,
+                            onValueChange = { v -> viewModel.update { it.copy(depositAmount = v) } },
+                            label = "مبلغ واریزی پروژه تا امروز",
+                        )
+                        SpacerH(8)
+                        MoneyField(
+                            value = form.bonusAmount,
+                            onValueChange = { v -> viewModel.update { it.copy(bonusAmount = v) } },
+                            label = "مبلغ امتیاز پروژه (سود پروژه)",
+                        )
+                        SpacerH(8)
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Column(Modifier.padding(12.dp)) {
+                                Text(
+                                    "مجموع پرداختی خریدار (واریزی + امتیاز):",
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
+                                Text(
+                                    "${Formatters.amountWithUnit(form.computedTotal)}",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary,
+                                )
+                            }
+                        }
+                    }
+
+                    Constants.PRICING_SHARE -> {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            NumberField(
+                                value = form.shareMeterArea,
+                                onValueChange = { v -> viewModel.update { it.copy(shareMeterArea = v) } },
+                                label = "متراژ هر سهم",
+                                suffix = "م²",
+                                decimal = true,
+                                modifier = Modifier.weight(1f),
+                            )
+                            NumberField(
+                                value = form.shareCount,
+                                onValueChange = { v -> viewModel.update { it.copy(shareCount = v) } },
+                                label = "تعداد سهم",
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                        SpacerH(8)
+                        MoneyField(
+                            value = form.sharePrice,
+                            onValueChange = { v -> viewModel.update { it.copy(sharePrice = v) } },
+                            label = "قیمت هر سهم",
+                        )
+                        SpacerH(8)
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Column(Modifier.padding(12.dp)) {
+                                Text(
+                                    "مبلغ کل سهام:",
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
+                                Text(
+                                    "${Formatters.amountWithUnit(form.computedTotal)}",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary,
+                                )
+                            }
+                        }
+                    }
+
+                    else -> { // METER
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            NumberField(
+                                value = form.meterArea,
+                                onValueChange = { v -> viewModel.update { it.copy(meterArea = v) } },
+                                label = "متراژ واحد",
+                                suffix = "م²",
+                                decimal = true,
+                                modifier = Modifier.weight(1f),
+                            )
+                            MoneyField(
+                                value = form.pricePerMeter,
+                                onValueChange = { v -> viewModel.update { it.copy(pricePerMeter = v) } },
+                                label = "قیمت هر متر مربع",
+                                modifier = Modifier.weight(1.5f),
+                            )
+                        }
+                        SpacerH(8)
+                        MoneyField(
+                            value = form.totalPrice.ifBlank { form.computedTotal.toString() },
+                            onValueChange = { v -> viewModel.update { it.copy(totalPrice = v) } },
+                            label = "مبلغ کل فایل",
+                            helperText = "از حاصل‌ضرب متراژ در قیمت هر متر محاسبه می‌شود",
+                        )
+                    }
+                }
+            }
+        }
+
+        // --- ۴) رتبه‌بندی فایل ---
+        item {
+            SectionCard(title = "رتبه‌بندی فایل در پروژه") {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Switch(
+                        checked = form.hasRanking,
+                        onCheckedChange = { v -> viewModel.update { it.copy(hasRanking = v) } },
+                    )
+                    Text(" این فایل دارای رتبه در پروژه است", style = MaterialTheme.typography.bodySmall)
+                }
+                if (form.hasRanking) {
+                    SpacerH(8)
+                    FormTextField(
+                        value = form.ranking,
+                        onValueChange = { v -> viewModel.update { it.copy(ranking = v) } },
+                        label = "رتبه فایل (مثلاً: رتبه ۱۲، اولویت الف)",
+                    )
+                }
+            }
+        }
+
+        // --- ۵) شرایط فروش ---
+        item {
+            SectionCard(title = "شرایط فروش") {
+                Text("نوع پرداخت و تسویه:", style = MaterialTheme.typography.bodySmall)
+                SpacerH(4)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(
+                            checked = form.saleConditionCash,
+                            onCheckedChange = { v -> viewModel.update { it.copy(saleConditionCash = v) } },
+                        )
+                        Text("نقد", style = MaterialTheme.typography.bodyMedium)
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(
+                            checked = form.saleConditionInstallment,
+                            onCheckedChange = { v -> viewModel.update { it.copy(saleConditionInstallment = v) } },
+                        )
+                        Text("شرایطی", style = MaterialTheme.typography.bodyMedium)
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(
+                            checked = form.saleConditionExchange,
+                            onCheckedChange = { v -> viewModel.update { it.copy(saleConditionExchange = v) } },
+                        )
+                        Text("تهاتر", style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
                 SpacerH(8)
-                DropdownField(
-                    label = "نوع پرداخت",
-                    options = PreFileForm.paymentTypeOptions(),
-                    selected = form.paymentType,
-                    onSelect = { v -> viewModel.update { it.copy(paymentType = v) } },
+                FormTextField(
+                    value = form.saleConditionNotes,
+                    onValueChange = { v -> viewModel.update { it.copy(saleConditionNotes = v) } },
+                    label = "توضیحات شرایط فروش (مثلاً نوع خودرو یا ملک جهت تهاتر)",
+                    singleLine = false,
+                    minLines = 2,
                 )
             }
         }
 
+        // --- ۶) اطلاعات اقساط پرونده ---
         item {
-            SectionCard(title = "قسط‌بندی", subtitle = "با ذخیره، جدول اقساط به‌صورت خودکار ساخته می‌شود") {
+            SectionCard(
+                title = "اقساط پروژه",
+                subtitle = "مشخصات اقساط این فایل برای ارائه به خریدار",
+            ) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     NumberField(
                         value = form.installmentCount,
@@ -351,139 +526,44 @@ fun PreFileEditScreen(
                         label = "تعداد اقساط",
                         modifier = Modifier.weight(1f),
                     )
+                    NumberField(
+                        value = form.remainingInstallmentsCount,
+                        onValueChange = { v -> viewModel.update { it.copy(remainingInstallmentsCount = v) } },
+                        label = "تعداد اقساط مانده",
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                SpacerH(8)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    MoneyField(
+                        value = form.installmentAmount,
+                        onValueChange = { v -> viewModel.update { it.copy(installmentAmount = v) } },
+                        label = "مبلغ هر قسط",
+                        modifier = Modifier.weight(1.2f),
+                    )
                     DropdownField(
                         label = "دوره پرداخت",
-                        options = PreFileForm.installmentPeriods,
+                        options = listOf("ماهانه", "دو ماهه", "سه ماهه / فصلی", "شش ماهه", "سالانه"),
                         selected = form.installmentPeriod,
                         onSelect = { v -> viewModel.update { it.copy(installmentPeriod = v) } },
                         modifier = Modifier.weight(1f),
                     )
                 }
                 SpacerH(8)
-                MoneyField(
-                    value = form.installmentAmount.ifBlank { form.suggestedInstallment().toString() },
-                    onValueChange = { v -> viewModel.update { it.copy(installmentAmount = v) } },
-                    label = "مبلغ هر قسط",
-                    helperText = "اگر خالی بماند: (مبلغ نهایی − پیش‌پرداخت) ÷ تعداد اقساط = ${Formatters.amountShort(form.suggestedInstallment())} تومان",
-                )
-                SpacerH(8)
                 JalaliDateField(
-                    value = form.installmentStartDate,
-                    onValueChange = { v -> viewModel.update { it.copy(installmentStartDate = v) } },
-                    label = "تاریخ شروع اقساط",
+                    value = form.nextInstallmentDueDate,
+                    onValueChange = { v -> viewModel.update { it.copy(nextInstallmentDueDate = v) } },
+                    label = "تاریخ سررسید قسط پیش‌رو",
+                    quickMonths = listOf(1, 2, 3),
                 )
-                SpacerH(6)
-                Text(
-                    "مبلغ قابل قسط‌بندی: ${Formatters.amountWithUnit(form.remainingValue)}",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                SpacerH(6)
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    androidx.compose.material3.Switch(
-                        checked = viewModel.autoGenerateInstallments,
-                        onCheckedChange = { viewModel.setAutoGenerate(it) },
-                    )
-                    Text("ساخت خودکار جدول اقساط هنگام ذخیره", style = MaterialTheme.typography.bodySmall)
-                }
             }
         }
 
+        // --- ۷) وضعیت و تحویل ---
         item {
-            SectionCard(title = "تعهدات و شرایط") {
-                FormTextField(
-                    value = form.sellerCommitment,
-                    onValueChange = { v -> viewModel.update { it.copy(sellerCommitment = v) } },
-                    label = "تعهد فروشنده",
-                    singleLine = false,
-                    minLines = 2,
-                )
-                SpacerH(8)
-                FormTextField(
-                    value = form.buyerCommitment,
-                    onValueChange = { v -> viewModel.update { it.copy(buyerCommitment = v) } },
-                    label = "تعهد خریدار",
-                    singleLine = false,
-                    minLines = 2,
-                )
-                SpacerH(8)
-                FormTextField(
-                    value = form.penaltyClause,
-                    onValueChange = { v -> viewModel.update { it.copy(penaltyClause = v) } },
-                    label = "جریمه عدم انجام تعهد",
-                    singleLine = false,
-                    minLines = 2,
-                )
-                SpacerH(8)
-                FormTextField(
-                    value = form.cancellationTerms,
-                    onValueChange = { v -> viewModel.update { it.copy(cancellationTerms = v) } },
-                    label = "شرایط فسخ / انصراف",
-                    singleLine = false,
-                    minLines = 2,
-                )
-                SpacerH(8)
+            SectionCard(title = "وضعیت فایل و تحویل") {
                 DropdownField(
-                    label = "نوع ضمانت",
-                    options = listOf("بدون ضمانت", "چک", "سفته", "ضامن", "چک + ضامن", "تهاتر"),
-                    selected = form.guaranteeType.takeIf { it.isNotBlank() },
-                    onSelect = { v -> viewModel.update { it.copy(guaranteeType = v) } },
-                    allowEmpty = true,
-                )
-                SpacerH(8)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    NumberField(
-                        value = form.chequeCount,
-                        onValueChange = { v -> viewModel.update { it.copy(chequeCount = v) } },
-                        label = "تعداد چک",
-                        modifier = Modifier.weight(1f),
-                    )
-                    MoneyField(
-                        value = form.chequeAmount,
-                        onValueChange = { v -> viewModel.update { it.copy(chequeAmount = v) } },
-                        label = "مبلغ چک‌ها",
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-            }
-        }
-
-        item {
-            SectionCard(title = "تنظیم سند و تحویل") {
-                JalaliDateField(
-                    value = form.deedDate,
-                    onValueChange = { v -> viewModel.update { it.copy(deedDate = v) } },
-                    label = "تاریخ تنظیم سند رسمی",
-                    quickMonths = listOf(6, 12),
-                )
-                SpacerH(8)
-                FormTextField(
-                    value = form.deedOffice,
-                    onValueChange = { v -> viewModel.update { it.copy(deedOffice = v) } },
-                    label = "دفترخانه / محل تنظیم سند",
-                )
-                SpacerH(8)
-                JalaliDateField(
-                    value = form.deliveryDate,
-                    onValueChange = { v -> viewModel.update { it.copy(deliveryDate = v) } },
-                    label = "تاریخ تحویل واحد",
-                    quickMonths = listOf(6, 12),
-                )
-                SpacerH(8)
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    androidx.compose.material3.Switch(
-                        checked = form.isUnitMortgaged,
-                        onCheckedChange = { v -> viewModel.update { it.copy(isUnitMortgaged = v) } },
-                    )
-                    Text("واحد در رهن/بازداشت است", style = MaterialTheme.typography.bodySmall)
-                }
-            }
-        }
-
-        item {
-            SectionCard(title = "وضعیت و توضیحات") {
-                DropdownField(
-                    label = "وضعیت پیش‌فایل",
+                    label = "وضعیت پیش‌فروش",
                     options = Constants.preFileStatuses.map { Constants.preFileStatusLabel(it) },
                     selected = Constants.preFileStatusLabel(form.status),
                     onSelect = { label ->
@@ -492,18 +572,17 @@ fun PreFileEditScreen(
                     },
                 )
                 SpacerH(8)
-                FormTextField(
-                    value = form.exchangeDetails,
-                    onValueChange = { v -> viewModel.update { it.copy(exchangeDetails = v) } },
-                    label = "جزئیات تهاتر / تسهیلات",
-                    singleLine = false,
-                    minLines = 2,
+                JalaliDateField(
+                    value = form.deliveryDate,
+                    onValueChange = { v -> viewModel.update { it.copy(deliveryDate = v) } },
+                    label = "تاریخ تقریبی تحویل واحد",
+                    quickMonths = listOf(6, 12),
                 )
                 SpacerH(8)
                 FormTextField(
                     value = form.notes,
                     onValueChange = { v -> viewModel.update { it.copy(notes = v) } },
-                    label = "یادداشت",
+                    label = "توضیحات و یادداشت تکمیلی",
                     singleLine = false,
                     minLines = 3,
                 )
@@ -512,11 +591,9 @@ fun PreFileEditScreen(
 
         item {
             Button(
-                onClick = {
-                    viewModel.save { id -> onSaved(id) }
-                },
+                onClick = { viewModel.save { id -> onSaved(id) } },
                 modifier = Modifier.fillMaxWidth(),
-            ) { Text(if (preFileId == null) "ثبت پیش‌فایل" else "ذخیره تغییرات") }
+            ) { Text(if (preFileId == null) "ثبت فایل پیش‌فروش" else "ذخیره تغییرات") }
         }
         item {
             OutlinedButton(onClick = onBack, modifier = Modifier.fillMaxWidth()) { Text("انصراف") }
@@ -524,28 +601,27 @@ fun PreFileEditScreen(
     }
 }
 
+/**
+ * نمایش کامل مشخصات فایل پیش‌فروش جهت ارائه به خریدار
+ */
 @Composable
 fun PreFileDetailScreen(
     preFileId: String,
     onBack: () -> Unit,
     onEdit: () -> Unit,
     onOpenUnit: (String) -> Unit,
-    onOpenCustomer: (String) -> Unit,
     viewModel: PreFileDetailViewModel = viewModel(factory = AppViewModelProvider.Factory),
 ) {
     viewModel.setPreFileId(preFileId)
 
     val row by viewModel.row.collectAsStateWithLifecycle()
-    val installments by viewModel.installments.collectAsStateWithLifecycle()
     val unit by viewModel.unit.collectAsStateWithLifecycle()
-    val customer by viewModel.customer.collectAsStateWithLifecycle()
 
     var showDelete by remember { mutableStateOf(false) }
     var showStatusMenu by remember { mutableStateOf(false) }
-    var payingInstallment by remember { mutableStateOf<InstallmentEntity?>(null) }
 
     val currentRow = row ?: return
-    val preFile = currentRow.preFile
+    val pf = currentRow.preFile
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -554,8 +630,8 @@ fun PreFileDetailScreen(
     ) {
         item {
             SectionCard(
-                title = "${preFile.draftNumber} • ${currentRow.customerName ?: "بدون مشتری"}",
-                subtitle = "${currentRow.projectName ?: ""} • ${currentRow.unitTitle ?: ""}",
+                title = "${pf.draftNumber} • ${currentRow.projectName ?: "پروژه"}",
+                subtitle = currentRow.unitTitle ?: "بدون واحد مشخص",
                 trailing = {
                     Row {
                         IconButton(onClick = onEdit) { Icon(Icons.Filled.Edit, contentDescription = "ویرایش") }
@@ -580,130 +656,81 @@ fun PreFileDetailScreen(
                 },
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    StatusChip(Constants.preFileStatusLabel(preFile.status), preFileStatusColor(preFile.status))
+                    StatusChip(Constants.preFileStatusLabel(pf.status), preFileStatusColor(pf.status))
                     SpacerH(0)
                     Text(
-                        "  ${Formatters.toPersianDigits(preFile.draftDate)}",
+                        "  تاریخ ثبت: ${Formatters.toPersianDigits(pf.draftDate)}",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                SpacerH(10)
-                PaymentProgress(paid = preFile.paidAmount, total = preFile.effectivePrice)
-                SpacerH(6)
-                InfoRow("کارشناس فروش", preFile.salesAgentName)
-                InfoRow("تاریخ تحویل", preFile.deliveryDate?.let { Formatters.toPersianDigits(it) })
-                InfoRow("کد رزرو", preFile.trackingCode)
+                SpacerH(8)
+                InfoRow("مالک / سپارنده", pf.ownerName)
+                InfoRow("شماره تماس", pf.ownerPhone)
+                InfoRow("مدل پروژه", Constants.projectPricingModelLabel(pf.pricingModel))
+                if (pf.hasRanking && !pf.ranking.isNullOrBlank()) {
+                    InfoRow("رتبه در پروژه", pf.ranking, emphasize = true)
+                }
             }
         }
 
         item {
-            SectionCard(title = "شرایط مالی") {
-                InfoRow("قیمت هر متر", Formatters.amountWithUnit(preFile.pricePerMeter))
-                InfoRow("مبلغ کل", Formatters.amountWithUnit(preFile.totalPrice))
-                InfoRow("تخفیف", Formatters.amountWithUnit(preFile.discount))
-                InfoRow("مبلغ نهایی", Formatters.amountWithUnit(preFile.finalPrice), emphasize = true)
-                InfoRow("پیش‌پرداخت", Formatters.amountWithUnit(preFile.prepayment))
-                InfoRow("دریافتی", Formatters.amountWithUnit(preFile.paidAmount))
-                InfoRow("مانده", Formatters.amountWithUnit(preFile.remainingAmount), emphasize = true)
-                InfoRow("نوع پرداخت", Constants.paymentTypeLabel(preFile.paymentType))
-                InfoRow(
-                    "قسط",
-                    preFile.installmentAmount?.let {
-                        "${Formatters.amountShort(it)} تومان × ${Formatters.number(preFile.installmentCount ?: 0)} (${preFile.installmentPeriod ?: "ماهانه"})"
-                    },
-                )
-                InfoRow("شروع اقساط", preFile.installmentStartDate?.let { Formatters.toPersianDigits(it) })
-            }
-        }
-
-        item {
-            SectionCard(title = "اقساط و سررسیدها (${Formatters.number(installments.size)})") {
-                if (installments.isEmpty()) {
-                    Text(
-                        "قسطی ثبت نشده — با ویرایش پیش‌فایل و تنظیم تعداد اقساط، جدول ساخته می‌شود",
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                } else {
-                    installments.forEach { installment ->
-                        Column(Modifier.padding(vertical = 8.dp)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Column(Modifier.weight(1f)) {
-                                    Text(
-                                        installment.title ?: "قسط ${installment.installmentNumber}",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                    )
-                                    Text(
-                                        "سررسید ${Formatters.toPersianDigits(installment.dueDate)} • ${Formatters.relativeJalali(installment.dueDate)}",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
-                                Column(horizontalAlignment = Alignment.End) {
-                                    Text(
-                                        "${Formatters.amountShort(installment.amount)} تومان",
-                                        style = MaterialTheme.typography.labelMedium,
-                                    )
-                                    StatusChip(
-                                        Constants.installmentStatusLabel(installment.status),
-                                        installmentStatusColor(installment.status),
-                                    )
-                                }
-                            }
-                            SpacerH(6)
-                            if (installment.status == Constants.INSTALLMENT_PAID) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(
-                                        "پرداخت‌شده در ${installment.paidDate?.let { Formatters.toPersianDigits(it) } ?: "—"}",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = StatusColors.paid,
-                                        modifier = Modifier.weight(1f),
-                                    )
-                                    TextButton(onClick = { viewModel.unpayInstallment(installment.id) }) {
-                                        Text("لغو پرداخت")
-                                    }
-                                }
-                            } else {
-                                Button(
-                                    onClick = { payingInstallment = installment },
-                                    modifier = Modifier.fillMaxWidth(),
-                                ) { Text("ثبت پرداخت این قسط") }
-                            }
-                        }
-                        SoftDivider()
+            SectionCard(title = "اطلاعات مالی فایل") {
+                when (pf.pricingModel) {
+                    Constants.PRICING_DEPOSIT_BONUS -> {
+                        InfoRow("مبلغ واریزی تا امروز", Formatters.amountWithUnit(pf.depositAmount))
+                        InfoRow("مبلغ امتیاز (سود پروژه)", Formatters.amountWithUnit(pf.bonusAmount))
+                        InfoRow("مجموع پرداختی خرید (واریزی + امتیاز)", Formatters.amountWithUnit(pf.computedTotal), emphasize = true)
+                    }
+                    Constants.PRICING_SHARE -> {
+                        InfoRow("متراژ هر سهم", pf.shareMeterArea?.let { "${Formatters.number(it.toInt())} م²" })
+                        InfoRow("تعداد سهم", Formatters.number(pf.shareCount))
+                        InfoRow("قیمت هر سهم", Formatters.amountWithUnit(pf.sharePrice))
+                        InfoRow("مبلغ کل سهام", Formatters.amountWithUnit(pf.computedTotal), emphasize = true)
+                    }
+                    else -> { // METER
+                        InfoRow("متراژ", pf.meterArea?.let { "${Formatters.number(it.toInt())} م²" })
+                        InfoRow("قیمت هر مترمربع", Formatters.amountWithUnit(pf.pricePerMeter))
+                        InfoRow("مبلغ کل فایل", Formatters.amountWithUnit(pf.displayPrice), emphasize = true)
                     }
                 }
             }
         }
 
         item {
-            SectionCard(title = "تعهدات و سند") {
-                InfoRow("تعهد فروشنده", preFile.sellerCommitment)
-                InfoRow("تعهد خریدار", preFile.buyerCommitment)
-                InfoRow("جریمه", preFile.penaltyClause)
-                InfoRow("شرایط فسخ", preFile.cancellationTerms)
-                InfoRow("تاریخ سند", preFile.deedDate?.let { Formatters.toPersianDigits(it) })
-                InfoRow("دفترخانه", preFile.deedOffice)
-                InfoRow("نوع ضمانت", preFile.guaranteeType)
-                InfoRow("چک‌ها", preFile.chequeCount?.let { "${Formatters.number(it)} فقره — ${Formatters.amountWithUnit(preFile.chequeAmount)}" })
-                InfoRow("تهاتر", preFile.exchangeDetails)
-                InfoRow("یادداشت", preFile.notes)
+            SectionCard(title = "شرایط فروش") {
+                InfoRow("نوع پرداخت", pf.saleConditionsSummary, emphasize = true)
+                InfoRow("توضیحات شرایط و تهاتر", pf.saleConditionNotes)
             }
         }
 
-        if (unit != null || customer != null) {
+        item {
+            SectionCard(title = "اطلاعات اقساط") {
+                InfoRow("تعداد کل اقساط", Formatters.number(pf.installmentCount))
+                InfoRow("تعداد اقساط مانده", Formatters.number(pf.remainingInstallmentsCount), emphasize = true)
+                InfoRow("مبلغ هر قسط", Formatters.amountWithUnit(pf.installmentAmount))
+                InfoRow("دوره پرداخت", pf.installmentPeriod)
+                InfoRow("تاریخ سررسید قسط پیش‌رو", pf.nextInstallmentDueDate?.let { Formatters.toPersianDigits(it) }, emphasize = true)
+            }
+        }
+
+        item {
+            SectionCard(title = "تحویل و یادداشت‌ها") {
+                InfoRow("تاریخ تقریبی تحویل", pf.deliveryDate?.let { Formatters.toPersianDigits(it) })
+                InfoRow("یادداشت", pf.notes)
+            }
+        }
+
+        if (unit != null) {
             item {
-                SectionCard(title = "دسترسی سریع") {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        unit?.let { u ->
-                            OutlinedButton(onClick = { onOpenUnit(u.id) }, modifier = Modifier.weight(1f)) {
-                                Text("مشاهده واحد ${u.unitNumber}")
-                            }
-                        }
-                        customer?.let { c ->
-                            OutlinedButton(onClick = { onOpenCustomer(c.id) }, modifier = Modifier.weight(1f)) {
-                                Text("پرونده ${c.firstName}")
-                            }
+                SectionCard(title = "مشخصات واحد مربوطه") {
+                    unit?.let { u ->
+                        InfoRow("عنوان واحد", u.displayTitle)
+                        InfoRow("متراژ ناخالص", u.grossArea?.let { "${Formatters.number(it.toInt())} م²" })
+                        InfoRow("جهت", u.direction)
+                        SpacerH(6)
+                        OutlinedButton(onClick = { onOpenUnit(u.id) }, modifier = Modifier.fillMaxWidth()) {
+                            Text("مشاهده جزئیات کامل واحد")
                         }
                     }
                 }
@@ -715,71 +742,12 @@ fun PreFileDetailScreen(
         }
     }
 
-    payingInstallment?.let { installment ->
-        InstallmentPayDialog(
-            installment = installment,
-            onDismiss = { payingInstallment = null },
-            onConfirm = { amount, method, reference ->
-                viewModel.payInstallment(installment.id, amount, method, reference)
-                payingInstallment = null
-            },
-        )
-    }
-
     if (showDelete) {
         ConfirmDialog(
-            title = "حذف پیش‌فایل",
-            message = "پیش‌فایل ${preFile.draftNumber} و اقساط آن حذف شوند؟",
+            title = "حذف فایل پیش‌فروش",
+            message = "فایل ${pf.draftNumber} حذف شود؟",
             onConfirm = { viewModel.delete(onBack) },
             onDismiss = { showDelete = false },
         )
     }
-}
-
-/** دیالوگ ثبت پرداخت قسط — با پیش‌فرض مبلغ کامل و امکان پرداخت جزئی */
-@Composable
-fun InstallmentPayDialog(
-    installment: InstallmentEntity,
-    onDismiss: () -> Unit,
-    onConfirm: (amount: Long, method: String?, reference: String?) -> Unit,
-) {
-    var amountText by remember { mutableStateOf(Formatters.amount(installment.amount - installment.paidAmount)) }
-    var method by remember { mutableStateOf("کارت‌به‌کارت") }
-    var reference by remember { mutableStateOf("") }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(installment.title ?: "قسط ${installment.installmentNumber}") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(
-                    "مبلغ قسط: ${Formatters.amountWithUnit(installment.amount)}",
-                    style = MaterialTheme.typography.bodySmall,
-                )
-                MoneyField(
-                    value = amountText,
-                    onValueChange = { amountText = it },
-                    label = "مبلغ پرداختی",
-                )
-                DropdownField(
-                    label = "روش پرداخت",
-                    options = listOf("کارت‌به‌کارت", "نقدی", "چک", "حواله", "تسویه بانکی"),
-                    selected = method,
-                    onSelect = { method = it },
-                )
-                FormTextField(
-                    value = reference,
-                    onValueChange = { reference = it },
-                    label = "شماره پیگیری / چک",
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = {
-                val amount = Formatters.parseLong(amountText) ?: 0L
-                if (amount > 0) onConfirm(amount, method, reference.ifBlank { null })
-            }) { Text("ثبت پرداخت") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("انصراف") } },
-    )
 }

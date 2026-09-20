@@ -51,15 +51,13 @@ import ir.pishfile.app.ui.viewmodel.FollowUpsViewModel
 @Composable
 fun FollowUpsScreen(
     openNewOnStart: Boolean,
-    onOpenCustomer: (String) -> Unit,
+    onOpenPreFile: (String) -> Unit,
     viewModel: FollowUpsViewModel = viewModel(factory = AppViewModelProvider.Factory),
 ) {
     var showDone by remember { mutableStateOf(false) }
     var showAddDialog by remember { mutableStateOf(openNewOnStart) }
 
     val followUps by viewModel.followUps.collectAsStateWithLifecycle()
-    val customerNames by viewModel.customerNames.collectAsStateWithLifecycle()
-    val customers by viewModel.customers.collectAsStateWithLifecycle()
     val preFileRows by viewModel.preFileRows.collectAsStateWithLifecycle()
 
     LaunchedEffect(openNewOnStart) {
@@ -83,7 +81,7 @@ fun FollowUpsScreen(
         if (followUps.isEmpty()) {
             EmptyState(
                 title = "پیگیری‌ای ثبت نشده",
-                subtitle = "تماس، بازدید و جلسه‌های پیش‌رو را این‌جا برنامه‌ریزی کنید",
+                subtitle = "تماس‌ها، بازدیدها و قرارهای پیگیری را این‌جا ثبت کنید",
                 icon = { Icon(Icons.Filled.EventNote, contentDescription = null) },
             )
         } else {
@@ -107,9 +105,9 @@ fun FollowUpsScreen(
                                     )
                                     Text(
                                         listOfNotNull(
-                                            followUp.customerId?.let { customerNames[it] },
                                             followUp.dueDate?.let { Formatters.toPersianDigits(it) },
                                             followUp.dueTime,
+                                            followUp.contactPhone,
                                         ).joinToString(" • "),
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -138,8 +136,8 @@ fun FollowUpsScreen(
                                         Icon(Icons.Filled.Check, contentDescription = null)
                                         Text(" انجام شد")
                                     }
-                                    followUp.customerId?.let { id ->
-                                        OutlinedButton(onClick = { onOpenCustomer(id) }) { Text("پرونده مشتری") }
+                                    followUp.preFileId?.let { id ->
+                                        OutlinedButton(onClick = { onOpenPreFile(id) }) { Text("مشاهده فایل") }
                                     }
                                 }
                             } else {
@@ -154,9 +152,7 @@ fun FollowUpsScreen(
 
     if (showAddDialog) {
         FollowUpDialog(
-            customers = customers.map { "${it.firstName} ${it.lastName}" },
-            preFiles = preFileRows.map { "${it.preFile.draftNumber} — ${it.customerName ?: ""}" },
-            customerIds = customers.map { it.id },
+            preFiles = preFileRows.map { "${it.preFile.draftNumber} — ${it.projectName ?: ""}" },
             preFileIds = preFileRows.map { it.preFile.id },
             onDismiss = { showAddDialog = false },
             onSave = { followUp ->
@@ -168,9 +164,7 @@ fun FollowUpsScreen(
 
 @Composable
 private fun FollowUpDialog(
-    customers: List<String>,
     preFiles: List<String>,
-    customerIds: List<String>,
     preFileIds: List<String>,
     onDismiss: () -> Unit,
     onSave: (FollowUpEntity) -> Unit,
@@ -181,7 +175,7 @@ private fun FollowUpDialog(
     var priority by remember { mutableStateOf("معمولی") }
     var dueDate by remember { mutableStateOf(Formatters.todayJalali()) }
     var dueTime by remember { mutableStateOf("") }
-    var customer by remember { mutableStateOf<String?>(null) }
+    var contactPhone by remember { mutableStateOf("") }
     var preFile by remember { mutableStateOf<String?>(null) }
 
     AlertDialog(
@@ -219,25 +213,28 @@ private fun FollowUpDialog(
                     label = "تاریخ پیگیری",
                     quickMonths = emptyList(),
                 )
-                FormTextField(value = dueTime, onValueChange = { dueTime = it }, label = "ساعت (مثلاً 10:30)")
-                if (customers.isNotEmpty()) {
-                    DropdownField(
-                        label = "مشتری",
-                        options = customers,
-                        selected = customer,
-                        onSelect = { customer = it },
-                        allowEmpty = true,
-                        emptyLabel = "بدون مشتری",
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FormTextField(
+                        value = dueTime,
+                        onValueChange = { dueTime = it },
+                        label = "ساعت (۱۰:۳۰)",
+                        modifier = Modifier.weight(1f),
+                    )
+                    FormTextField(
+                        value = contactPhone,
+                        onValueChange = { contactPhone = it },
+                        label = "شماره تماس",
+                        modifier = Modifier.weight(1f),
                     )
                 }
                 if (preFiles.isNotEmpty()) {
                     DropdownField(
-                        label = "پیش‌فایل",
+                        label = "فایل پیش‌فروش مربوطه",
                         options = preFiles,
                         selected = preFile,
                         onSelect = { preFile = it },
                         allowEmpty = true,
-                        emptyLabel = "بدون پیش‌فایل",
+                        emptyLabel = "بدون فایل",
                     )
                 }
             }
@@ -251,10 +248,10 @@ private fun FollowUpDialog(
                             priority = FollowUpViews.toPriorityCode(priority),
                             title = title.trim(),
                             description = description.ifBlank { null },
-                            customerId = customer?.let { name -> customerIds.getOrNull(customers.indexOf(name)) },
                             preFileId = preFile?.let { label -> preFileIds.getOrNull(preFiles.indexOf(label)) },
                             dueDate = dueDate.ifBlank { null },
                             dueTime = dueTime.ifBlank { null },
+                            contactPhone = contactPhone.ifBlank { null },
                             status = Constants.FOLLOWUP_PENDING,
                         )
                     )
@@ -265,7 +262,6 @@ private fun FollowUpDialog(
     )
 }
 
-/** تبدیل برچسب به کد */
 private object FollowUpViews {
     fun toCode(label: String): String =
         FollowUpsViewModel.types.firstOrNull { it.second == label }?.first ?: "CALL"

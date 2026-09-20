@@ -48,7 +48,6 @@ import ir.pishfile.app.ui.components.JalaliDateField
 import ir.pishfile.app.ui.components.MoneyField
 import ir.pishfile.app.ui.components.MultiSelectChips
 import ir.pishfile.app.ui.components.NumberField
-import ir.pishfile.app.ui.components.PaymentProgress
 import ir.pishfile.app.ui.components.SearchField
 import ir.pishfile.app.ui.components.SectionCard
 import ir.pishfile.app.ui.components.SoftDivider
@@ -273,106 +272,17 @@ fun UnitEditScreen(
                 SpacerH(8)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     NumberField(
-                        value = form.balconyArea,
-                        onValueChange = { v -> viewModel.update { it.copy(balconyArea = v) } },
-                        label = "بالکن/تراس",
-                        suffix = "م²",
-                        decimal = true,
-                        modifier = Modifier.weight(1f),
-                    )
-                    NumberField(
-                        value = form.ceilingHeight,
-                        onValueChange = { v -> viewModel.update { it.copy(ceilingHeight = v) } },
-                        label = "ارتفاع سقف",
-                        suffix = "سم",
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-                SpacerH(8)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    NumberField(
                         value = form.bedrooms,
                         onValueChange = { v -> viewModel.update { it.copy(bedrooms = v) } },
                         label = "خواب",
                         modifier = Modifier.weight(1f),
                     )
-                    NumberField(
-                        value = form.bathrooms,
-                        onValueChange = { v -> viewModel.update { it.copy(bathrooms = v) } },
-                        label = "سرویس",
-                        modifier = Modifier.weight(1f),
-                    )
-                    NumberField(
-                        value = form.kitchens,
-                        onValueChange = { v -> viewModel.update { it.copy(kitchens = v) } },
-                        label = "آشپزخانه",
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-                SpacerH(8)
-                DropdownField(
-                    label = "جهت واحد",
-                    options = Constants.unitDirections,
-                    selected = form.direction.takeIf { it.isNotBlank() },
-                    onSelect = { v -> viewModel.update { it.copy(direction = v) } },
-                    allowEmpty = true,
-                )
-                SpacerH(8)
-                FormTextField(
-                    value = form.view,
-                    onValueChange = { v -> viewModel.update { it.copy(view = v) } },
-                    label = "منظر / ویو",
-                )
-                SpacerH(8)
-                DropdownField(
-                    label = "وضعیت در زمین",
-                    options = listOf("نبش", "وسط", "تک‌واحدی", "آخر"),
-                    selected = form.positionType.takeIf { it.isNotBlank() },
-                    onSelect = { v -> viewModel.update { it.copy(positionType = v) } },
-                    allowEmpty = true,
-                )
-            }
-        }
-
-        item {
-            SectionCard(title = "امکانات و ضمائم") {
-                MultiSelectChips(
-                    label = "امکانات",
-                    options = Constants.facilities,
-                    selected = form.facilities,
-                    onToggle = { item ->
-                        val current = form.facilities.toMutableSet()
-                        if (!current.add(item)) current.remove(item)
-                        viewModel.update { it.copy(facilities = current) }
-                    },
-                )
-                SpacerH(10)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    NumberField(
-                        value = form.parkingCount,
-                        onValueChange = { v -> viewModel.update { it.copy(parkingCount = v) } },
-                        label = "تعداد پارکینگ",
-                        modifier = Modifier.weight(1f),
-                    )
-                    FormTextField(
-                        value = form.parkingNumber,
-                        onValueChange = { v -> viewModel.update { it.copy(parkingNumber = v) } },
-                        label = "شماره پارکینگ",
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-                SpacerH(8)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    NumberField(
-                        value = form.storageCount,
-                        onValueChange = { v -> viewModel.update { it.copy(storageCount = v) } },
-                        label = "تعداد انباری",
-                        modifier = Modifier.weight(1f),
-                    )
-                    FormTextField(
-                        value = form.storageNumber,
-                        onValueChange = { v -> viewModel.update { it.copy(storageNumber = v) } },
-                        label = "شماره انباری",
+                    DropdownField(
+                        label = "جهت واحد",
+                        options = Constants.unitDirections,
+                        selected = form.direction.takeIf { it.isNotBlank() },
+                        onSelect = { v -> viewModel.update { it.copy(direction = v) } },
+                        allowEmpty = true,
                         modifier = Modifier.weight(1f),
                     )
                 }
@@ -391,51 +301,8 @@ fun UnitEditScreen(
                     value = form.totalPrice.ifBlank { form.computedTotalPrice()?.toString().orEmpty() },
                     onValueChange = { v -> viewModel.update { it.copy(totalPrice = v) } },
                     label = "قیمت کل واحد",
-                    helperText = "اگر خالی بماند، از متراژ × قیمت هر متر محاسبه می‌شود",
+                    helperText = "از متراژ × قیمت هر متر محاسبه می‌شود",
                 )
-                SpacerH(8)
-                MoneyField(
-                    value = form.discount,
-                    onValueChange = { v -> viewModel.update { it.copy(discount = v) } },
-                    label = "تخفیف",
-                )
-                SpacerH(8)
-                MoneyField(
-                    value = form.finalPrice,
-                    onValueChange = { v -> viewModel.update { it.copy(finalPrice = v) } },
-                    label = "قیمت نهایی توافق‌شده",
-                )
-                SpacerH(8)
-                MoneyField(
-                    value = form.costPrice,
-                    onValueChange = { v -> viewModel.update { it.copy(costPrice = v) } },
-                    label = "قیمت تمام‌شده (برای محاسبه سود)",
-                )
-            }
-        }
-
-        item {
-            SectionCard(title = "شرایط پیشنهادی پرداخت") {
-                MoneyField(
-                    value = form.prepaymentSuggestion,
-                    onValueChange = { v -> viewModel.update { it.copy(prepaymentSuggestion = v) } },
-                    label = "پیش‌پرداخت پیشنهادی",
-                )
-                SpacerH(8)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    NumberField(
-                        value = form.suggestedInstallmentCount,
-                        onValueChange = { v -> viewModel.update { it.copy(suggestedInstallmentCount = v) } },
-                        label = "تعداد اقساط",
-                        modifier = Modifier.weight(1f),
-                    )
-                    MoneyField(
-                        value = form.suggestedInstallment,
-                        onValueChange = { v -> viewModel.update { it.copy(suggestedInstallment = v) } },
-                        label = "مبلغ هر قسط",
-                        modifier = Modifier.weight(1f),
-                    )
-                }
             }
         }
 
@@ -455,14 +322,6 @@ fun UnitEditScreen(
                     value = form.deliveryDate,
                     onValueChange = { v -> viewModel.update { it.copy(deliveryDate = v) } },
                     label = "تاریخ تحویل",
-                )
-                SpacerH(8)
-                FormTextField(
-                    value = form.technicalNotes,
-                    onValueChange = { v -> viewModel.update { it.copy(technicalNotes = v) } },
-                    label = "ملاحظات فنی",
-                    singleLine = false,
-                    minLines = 2,
                 )
                 SpacerH(8)
                 FormTextField(
@@ -610,44 +469,23 @@ fun UnitDetailScreen(
                 InfoRow("طبقه", Formatters.number(current.floor))
                 InfoRow("بلوک", current.block)
                 InfoRow("متراژ ناخالص", current.grossArea?.let { "${Formatters.number(it.toInt())} مترمربع" })
-                InfoRow("متراژ مفید", current.netArea?.let { "${Formatters.number(it.toInt())} مترمربع" })
-                InfoRow("بالکن", current.balconyArea?.let { "${Formatters.number(it.toInt())} مترمربع" })
-                InfoRow("ارتفاع سقف", current.ceilingHeight?.let { "${Formatters.number(it)} سانتی‌متر" })
-                InfoRow("خواب / سرویس", listOfNotNull(current.bedrooms, current.bathrooms).joinToString(" / ") { Formatters.number(it) })
+                InfoRow("خواب", current.bedrooms?.let { Formatters.number(it) })
                 InfoRow("جهت", current.direction)
-                InfoRow("منظر", current.view)
-                InfoRow("پارکینگ", current.parkingNumber ?: current.parkingCount.takeIf { it > 0 }?.let { Formatters.number(it) })
-                InfoRow("انباری", current.storageNumber)
-                InfoRow("امکانات", current.facilities?.replace(",", " • "))
                 InfoRow("تحویل", current.deliveryDate?.let { Formatters.toPersianDigits(it) })
-                InfoRow("ملاحظات فنی", current.technicalNotes)
             }
         }
 
         item {
             SectionCard(title = "قیمت‌گذاری") {
-                val total = current.finalPrice ?: current.totalPrice
-                PaymentProgress(paid = 0, total = total ?: 0)
-                SpacerH(10)
                 InfoRow("قیمت هر متر", Formatters.amountWithUnit(current.pricePerMeter))
-                InfoRow("قیمت کل", Formatters.amountWithUnit(current.totalPrice))
-                InfoRow("تخفیف", Formatters.amountWithUnit(current.discount))
-                InfoRow("قیمت نهایی", Formatters.amountWithUnit(current.finalPrice), emphasize = true)
-                InfoRow("پیش‌پرداخت پیشنهادی", Formatters.amountWithUnit(current.prepaymentSuggestion))
-                InfoRow(
-                    "قسط پیشنهادی",
-                    current.suggestedInstallment?.let {
-                        "${Formatters.amountShort(it)} تومان × ${Formatters.number(current.suggestedInstallmentCount ?: 0)} قسط"
-                    },
-                    emphasize = true,
-                )
+                InfoRow("قیمت کل", Formatters.amountWithUnit(current.totalPrice), emphasize = true)
             }
         }
 
         item {
-            SectionCard(title = "پیش‌فایل‌های این واحد (${Formatters.number(preFiles.size)})") {
+            SectionCard(title = "فایل‌های پیش‌فروش این واحد (${Formatters.number(preFiles.size)})") {
                 if (preFiles.isEmpty()) {
-                    Text("پیش‌فایلی برای این واحد ثبت نشده", style = MaterialTheme.typography.bodySmall)
+                    Text("فایل پیش‌فروشی برای این واحد ثبت نشده", style = MaterialTheme.typography.bodySmall)
                 } else {
                     preFiles.forEach { row ->
                         Card(
@@ -657,11 +495,11 @@ fun UnitDetailScreen(
                         ) {
                             Column(Modifier.padding(10.dp)) {
                                 Text(
-                                    "${row.preFile.draftNumber} • ${row.customerName ?: "—"}",
+                                    "${row.preFile.draftNumber} • مالک: ${row.preFile.ownerName ?: "—"}",
                                     style = MaterialTheme.typography.bodyMedium,
                                 )
                                 Text(
-                                    "${Formatters.amountShort(row.preFile.effectivePrice)} تومان • ${Constants.preFileStatusLabel(row.preFile.status)}",
+                                    "${Formatters.amountShort(row.preFile.computedTotal)} تومان • ${Constants.preFileStatusLabel(row.preFile.status)}",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
@@ -671,7 +509,7 @@ fun UnitDetailScreen(
                 }
                 SpacerH(10)
                 Button(onClick = onNewPreFile, modifier = Modifier.fillMaxWidth()) {
-                    Text("ثبت پیش‌فایل برای این واحد")
+                    Text("ثبت پیش‌فروش برای این واحد")
                 }
             }
         }
