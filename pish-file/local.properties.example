@@ -1,0 +1,9 @@
+# نمونه‌ی local.properties — این فایل را با نام local.properties کپی کنید
+# و مسیر SDK اندرویدِ سیستم خودتان را بنویسید (local.properties در مخزن کامیت نمی‌شود).
+#
+#   cp local.properties.example local.properties
+#
+# لینوکس:  /home/<user>/Android/Sdk
+# مک:      /Users/<user>/Library/Android/sdk
+# ویندوز:  C\:\\Users\\<user>\\AppData\\Local\\Android\\Sdk
+sdk.dir=/path/to/Android/Sdk

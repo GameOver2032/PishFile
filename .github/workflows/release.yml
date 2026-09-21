@@ -1,0 +1,148 @@
+name: Release APK
+
+# با push هر تگ vX.Y.Z یک Release روی گیت‌هاب ساخته می‌شود و فایل APK به آن چسبانده می‌شود.
+# اجرای دستی هم از تب Actions ← Release APK ← Run workflow ممکن است.
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "تگ نسخه (مثلاً v0.1.0)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    name: ساخت APK و انتشار Release
+    runs-on: ubuntu-latest
+    env:
+      # اگر این Secretها در Settings ← Secrets تعریف شده باشند، APK نسخه‌ی انتشار امضا می‌شود
+      PISHFILE_STORE_B64: ${{ secrets.PISHFILE_KEYSTORE_BASE64 }}
+      PISHFILE_STORE_PASSWORD: ${{ secrets.PISHFILE_STORE_PASSWORD }}
+      PISHFILE_KEY_ALIAS: ${{ secrets.PISHFILE_KEY_ALIAS }}
+      PISHFILE_KEY_PASSWORD: ${{ secrets.PISHFILE_KEY_PASSWORD }}
+    defaults:
+      run:
+        working-directory: pish-file
+    steps:
+      - name: دریافت کد
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: رفتن به تگ درخواست‌شده (اجرای دستی)
+        if: github.event_name == 'workflow_dispatch'
+        run: git checkout "${{ inputs.tag }}"
+
+      - name: حذف local.properties
+        run: rm -f local.properties
+
+      - name: نصب JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: آماده‌سازی Gradle و کش
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: خواندن نسخه از build.gradle.kts
+        id: version
+        run: |
+          set -eu
+          VERSION_NAME=$(sed -nE 's/.*versionName[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' app/build.gradle.kts | head -1)
+          VERSION_CODE=$(sed -nE 's/.*versionCode[[:space:]]*=[[:space:]]*([0-9]+).*/\1/p' app/build.gradle.kts | head -1)
+          echo "name=$VERSION_NAME" >> "$GITHUB_OUTPUT"
+          echo "code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
+          echo "versionName=$VERSION_NAME versionCode=$VERSION_CODE"
+
+      - name: تست‌های واحد
+        run: ./gradlew test --no-daemon --stacktrace
+
+      - name: ساخت APK نسخه‌ی آزمایشی (قابل نصب)
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: ساخت APK نسخه‌ی انتشار امضاشده (در صورت وجود کلید)
+        if: env.PISHFILE_STORE_B64 != ''
+        run: |
+          set -eux
+          KEYSTORE_PATH="$RUNNER_TEMP/pishfile-release.jks"
+          printf '%s' "$PISHFILE_STORE_B64" | base64 --decode > "$KEYSTORE_PATH"
+          ./gradlew assembleRelease --no-daemon --stacktrace \
+            -PPISHFILE_STORE_FILE="$KEYSTORE_PATH" \
+            -PPISHFILE_STORE_PASSWORD="$PISHFILE_STORE_PASSWORD" \
+            -PPISHFILE_KEY_ALIAS="$PISHFILE_KEY_ALIAS" \
+            -PPISHFILE_KEY_PASSWORD="$PISHFILE_KEY_PASSWORD"
+
+      - name: گردآوری فایل‌ها
+        run: |
+          set -eux
+          VERSION_NAME="${{ steps.version.outputs.name }}"
+          OUT="$GITHUB_WORKSPACE/dist"
+          mkdir -p "$OUT"
+          cp app/build/outputs/apk/debug/app-debug.apk "$OUT/PishFile-${VERSION_NAME}-debug.apk"
+          if [ -f app/build/outputs/apk/release/app-release.apk ]; then
+            cp app/build/outputs/apk/release/app-release.apk "$OUT/PishFile-${VERSION_NAME}-release.apk"
+          fi
+          ( cd "$OUT" && sha256sum *.apk > SHA256SUMS.txt )
+          ls -lh "$OUT"
+          cat "$OUT/SHA256SUMS.txt"
+
+      - name: نوشتن توضیحات Release
+        run: |
+          set -eu
+          VERSION_NAME="${{ steps.version.outputs.name }}"
+          VERSION_CODE="${{ steps.version.outputs.code }}"
+          HAS_RELEASE=""
+          [ -f "$GITHUB_WORKSPACE/dist/PishFile-${VERSION_NAME}-release.apk" ] && HAS_RELEASE="yes" || true
+          {
+            echo "## پیش‌فایل ${VERSION_NAME} (versionCode ${VERSION_CODE})"
+            echo
+            # اولین بخش CHANGELOG (تغییرات همین نسخه)
+            awk 'BEGIN{c=0} /^## /{c++; if(c==2) exit} c>=1' CHANGELOG.md
+            echo
+            echo "---"
+            echo
+            echo "### 📥 نصب"
+            echo
+            echo "1. فایل APK را روی گوشی اندروید (۸.۰ / API 26 و بالاتر) دانلود کنید."
+            echo "2. برای نصب، اجازه‌ی «نصب برنامه‌های ناشناس» را به مرورگر یا پیام‌رسان بدهید."
+            echo
+            echo "| فایل | کاربرد |"
+            echo "| --- | --- |"
+            echo "| \`PishFile-${VERSION_NAME}-debug.apk\` | نسخه‌ی آزمایشی با شناسه‌ی \`ir.pishfile.app.debug\` — برای تست و استفاده‌ی شخصی (امضای debug) |"
+            if [ -n "$HAS_RELEASE" ]; then
+              echo "| \`PishFile-${VERSION_NAME}-release.apk\` | نسخه‌ی انتشار امضاشده با شناسه‌ی \`ir.pishfile.app\` — بهینه‌شده (R8) و مناسب انتشار عمومی |"
+            else
+              echo "| \`PishFile-${VERSION_NAME}-release.apk\` | ⚠️ ساخته نشد — برای انتشار نسخه‌ی امضاشده، Secretهای امضا را در تنظیمات مخزن تعریف کنید (\`docs/RELEASE.md\`) |"
+            fi
+            echo
+            echo "برای اطمینان از سالم بودن فایل دانلودی، مقدار \`SHA256SUMS.txt\` را با خروجی \`sha256sum\` روی گوشی/رایانه مقایسه کنید."
+          } > "$GITHUB_WORKSPACE/RELEASE_NOTES.md"
+          cat "$GITHUB_WORKSPACE/RELEASE_NOTES.md"
+
+      - name: ساخت Release روی گیت‌هاب
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -eux
+          TAG="${GITHUB_REF_NAME}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ inputs.tag }}"
+          fi
+          VERSION_NAME="${{ steps.version.outputs.name }}"
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$GITHUB_WORKSPACE"/dist/* --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create "$TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "پیش‌فایل ${VERSION_NAME}" \
+              --notes-file "$GITHUB_WORKSPACE/RELEASE_NOTES.md" \
+              "$GITHUB_WORKSPACE"/dist/*
+          fi
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY"

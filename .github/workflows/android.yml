@@ -1,0 +1,88 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "arena/**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-and-build:
+    name: تست و ساخت APK (debug)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: pish-file
+    steps:
+      - uses: actions/checkout@v4
+
+      # local.properties مسیر SDK ماشین محلی توسعه‌دهنده است و نباید در CI استفاده شود
+      - name: حذف local.properties
+        run: rm -f local.properties
+
+      - name: نصب JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: آماده‌سازی Gradle و کش
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: تست‌های واحد
+        run: ./gradlew test --no-daemon --stacktrace
+
+      - name: ساخت APK نسخه‌ی آزمایشی
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: نام‌گذاری و گزارش خروجی
+        run: |
+          set -eux
+          APK_DIR=app/build/outputs/apk/debug
+          VERSION_NAME=$(sed -nE 's/.*versionName[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' app/build.gradle.kts | head -1)
+          cp "$APK_DIR/app-debug.apk" "$APK_DIR/PishFile-${VERSION_NAME}-debug.apk"
+          ls -lh "$APK_DIR"
+
+      - name: آپلود APK به‌عنوان Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pishfile-debug-apk
+          path: pish-file/app/build/outputs/apk/debug/PishFile-*-debug.apk
+          if-no-files-found: error
+          retention-days: 30
+
+  release-build-check:
+    name: بررسی ساخت نسخه‌ی انتشار (R8، بدون امضا)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    defaults:
+      run:
+        working-directory: pish-file
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: حذف local.properties
+        run: rm -f local.properties
+
+      - name: نصب JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: آماده‌سازی Gradle و کش
+        uses: gradle/actions/setup-gradle@v4
+
+      # فقط برای اطمینان از سالم بودن پیکربندی minify/shrinkResources — جلوی ادغام را نمی‌گیرد
+      - name: ساخت نسخه‌ی انتشار بدون امضا
+        run: ./gradlew assembleRelease --no-daemon --stacktrace
+
+      - name: گزارش خروجی
+        run: ls -lh app/build/outputs/apk/release/ || true
