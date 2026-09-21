@@ -37,10 +37,14 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: تست‌های واحد
-        run: ./gradlew test --no-daemon --stacktrace
+        run: |
+          set -eo pipefail
+          ./gradlew test --no-daemon --stacktrace --continue 2>&1 | tee "$RUNNER_TEMP/gradle.log"
 
       - name: ساخت APK نسخه‌ی آزمایشی
-        run: ./gradlew assembleDebug --no-daemon --stacktrace
+        run: |
+          set -eo pipefail
+          ./gradlew assembleDebug --no-daemon --stacktrace 2>&1 | tee -a "$RUNNER_TEMP/gradle.log"
 
       - name: نام‌گذاری و گزارش خروجی
         run: |
@@ -49,8 +53,30 @@ jobs:
           VERSION_NAME=$(sed -nE 's/.*versionName[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' app/build.gradle.kts | head -1)
           cp "$APK_DIR/app-debug.apk" "$APK_DIR/PishFile-${VERSION_NAME}-debug.apk"
           ls -lh "$APK_DIR"
+          {
+            echo "### ✅ ساخت موفق"
+            echo "- نسخه: \`${VERSION_NAME}\`"
+            echo "- فایل: \`PishFile-${VERSION_NAME}-debug.apk\`"
+            echo '```text'
+            ls -lh "$APK_DIR"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: گزارش خطا در خلاصه‌ی اجرا
+        if: failure()
+        run: |
+          {
+            echo "### ❌ خطای ساخت"
+            echo '```text'
+            grep -nE "^e: |^w: .*error|error:|FAILURE:|Execution failed|> Task .*FAILED|What went wrong|Caused by:" \
+              "$RUNNER_TEMP/gradle.log" | head -80 || true
+            echo "--- آخرین خطوط لاگ ---"
+            tail -n 120 "$RUNNER_TEMP/gradle.log" || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: آپلود APK به‌عنوان Artifact
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: pishfile-debug-apk
@@ -82,7 +108,29 @@ jobs:
 
       # فقط برای اطمینان از سالم بودن پیکربندی minify/shrinkResources — جلوی ادغام را نمی‌گیرد
       - name: ساخت نسخه‌ی انتشار بدون امضا
-        run: ./gradlew assembleRelease --no-daemon --stacktrace
+        run: |
+          set -eo pipefail
+          ./gradlew assembleRelease --no-daemon --stacktrace 2>&1 | tee "$RUNNER_TEMP/gradle.log"
 
       - name: گزارش خروجی
-        run: ls -lh app/build/outputs/apk/release/ || true
+        run: |
+          ls -lh app/build/outputs/apk/release/ || true
+          {
+            echo "### نسخه‌ی انتشار (بدون امضا)"
+            echo '```text'
+            ls -lh app/build/outputs/apk/release/ || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: گزارش خطا در خلاصه‌ی اجرا
+        if: failure()
+        run: |
+          {
+            echo "### ❌ خطای ساخت نسخه‌ی انتشار"
+            echo '```text'
+            grep -nE "^e: |error:|FAILURE:|Execution failed|> Task .*FAILED|What went wrong|Caused by:" \
+              "$RUNNER_TEMP/gradle.log" | head -80 || true
+            echo "--- آخرین خطوط لاگ ---"
+            tail -n 120 "$RUNNER_TEMP/gradle.log" || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

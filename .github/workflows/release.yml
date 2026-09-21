@@ -62,10 +62,27 @@ jobs:
           echo "versionName=$VERSION_NAME versionCode=$VERSION_CODE"
 
       - name: تست‌های واحد
-        run: ./gradlew test --no-daemon --stacktrace
+        run: |
+          set -eo pipefail
+          ./gradlew test --no-daemon --stacktrace --continue 2>&1 | tee "$RUNNER_TEMP/gradle.log"
 
       - name: ساخت APK نسخه‌ی آزمایشی (قابل نصب)
-        run: ./gradlew assembleDebug --no-daemon --stacktrace
+        run: |
+          set -eo pipefail
+          ./gradlew assembleDebug --no-daemon --stacktrace 2>&1 | tee -a "$RUNNER_TEMP/gradle.log"
+
+      - name: گزارش خطا در خلاصه‌ی اجرا
+        if: failure()
+        run: |
+          {
+            echo "### ❌ خطای ساخت در گردش‌کار انتشار"
+            echo '```text'
+            grep -nE "^e: |error:|FAILURE:|Execution failed|> Task .*FAILED|What went wrong|Caused by:" \
+              "$RUNNER_TEMP/gradle.log" | head -80 || true
+            echo "--- آخرین خطوط لاگ ---"
+            tail -n 120 "$RUNNER_TEMP/gradle.log" || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: ساخت APK نسخه‌ی انتشار امضاشده (در صورت وجود کلید)
         if: env.PISHFILE_STORE_B64 != ''
