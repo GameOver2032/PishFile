@@ -124,7 +124,7 @@ class UnitListViewModel(
                 q.isNotBlank() -> repository.search(q)
                 else -> repository.observeAll()
             }
-            if (status == null) base else kotlinx.coroutines.flow.map(base) { list -> list.filter { it.status == status } }
+            if (status == null) base else base.map { list -> list.filter { it.status == status } }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
