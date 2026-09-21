@@ -4,14 +4,12 @@ import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -21,13 +19,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -50,14 +44,10 @@ fun SettingsScreen(
     val agentName by viewModel.agentName.collectAsStateWithLifecycle()
     val agentPhone by viewModel.agentPhone.collectAsStateWithLifecycle()
     val defaultCity by viewModel.defaultCity.collectAsStateWithLifecycle()
-    val defaultInstallmentCount by viewModel.defaultInstallmentCount.collectAsStateWithLifecycle()
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
     val persianDigits by viewModel.persianDigits.collectAsStateWithLifecycle()
-    val autoGenerateInst by viewModel.autoGenerateInstallments.collectAsStateWithLifecycle()
-    val lastSyncAt by viewModel.lastSyncAt.collectAsStateWithLifecycle()
     val pending by viewModel.pending.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
-    val isSyncing by viewModel.isSyncing.collectAsStateWithLifecycle()
 
     val importLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument(),
@@ -86,24 +76,24 @@ fun SettingsScreen(
         }
 
         item {
-            SectionCard(title = "اطلاعات دفتر / شعبه") {
+            SectionCard(title = "اطلاعات مشاور / دفتر املاک") {
                 FormTextField(
                     value = officeName,
                     onValueChange = viewModel::setOfficeName,
-                    label = "نام دفتر یا شرکت",
+                    label = "نام دفتر املاک یا آژانس",
                 )
                 SpacerH(8)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FormTextField(
                         value = agentName,
                         onValueChange = viewModel::setAgentName,
-                        label = "نام کارشناس فروش",
+                        label = "نام مشاور / کارشناس",
                         modifier = Modifier.weight(1f),
                     )
                     FormTextField(
                         value = agentPhone,
                         onValueChange = viewModel::setAgentPhone,
-                        label = "تلفن کارشناس",
+                        label = "شماره تماس مشاور",
                         modifier = Modifier.weight(1f),
                     )
                 }
@@ -112,12 +102,6 @@ fun SettingsScreen(
                     value = defaultCity,
                     onValueChange = viewModel::setDefaultCity,
                     label = "شهر پیش‌فرض",
-                )
-                SpacerH(8)
-                FormTextField(
-                    value = defaultInstallmentCount,
-                    onValueChange = viewModel::setDefaultInstallmentCount,
-                    label = "تعداد پیش‌فرض اقساط",
                 )
             }
         }
@@ -148,20 +132,13 @@ fun SettingsScreen(
                     Switch(checked = persianDigits, onCheckedChange = viewModel::setPersianDigits)
                     Text("نمایش اعداد به فارسی (۱۲۳)", style = MaterialTheme.typography.bodySmall)
                 }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Switch(
-                        checked = autoGenerateInst,
-                        onCheckedChange = viewModel::setAutoGenerateInstallments,
-                    )
-                    Text("ساخت خودکار جدول اقساط", style = MaterialTheme.typography.bodySmall)
-                }
             }
         }
 
         item {
             SectionCard(title = "پشتیبان‌گیری و خروجی") {
                 Text(
-                    "داده‌ها کاملاً روی همین گوشی ذخیره می‌شوند. برای اطمینان، هر چند وقت یک‌بار بکاپ بگیرید و در جای امن (ایمیل، تلگرام، درایو) نگه دارید.",
+                    "داده‌های شما به‌صورت آفلاین و محلی ذخیره می‌شوند. می‌توانید در هر زمان نسخه پشتیبان تهیه کنید یا به اکسل خروجی بگیرید.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -180,65 +157,36 @@ fun SettingsScreen(
                     modifier = Modifier.fillMaxWidth(),
                 ) { Text("بازیابی از فایل بکاپ") }
                 SpacerH(8)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(
-                        onClick = {
-                            viewModel.exportPreFilesCsv { intent ->
-                                context.startActivity(Intent.createChooser(intent, "خروجی پیش‌فایل‌ها"))
-                            }
-                        },
-                        modifier = Modifier.weight(1f),
-                    ) { Text("خروجی اکسل پیش‌فایل‌ها") }
-                    OutlinedButton(
-                        onClick = {
-                            viewModel.exportInstallmentsCsv { intent ->
-                                context.startActivity(Intent.createChooser(intent, "خروجی اقساط"))
-                            }
-                        },
-                        modifier = Modifier.weight(1f),
-                    ) { Text("خروجی اکسل اقساط") }
-                }
+                OutlinedButton(
+                    onClick = {
+                        viewModel.exportPreFilesCsv { intent ->
+                            context.startActivity(Intent.createChooser(intent, "خروجی فایل‌های پیش‌فروش"))
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text("خروجی اکسل پیش‌فروش‌ها (CSV)") }
             }
         }
 
         item {
-            SectionCard(title = "همگام‌سازی (آماده برای آینده)") {
-                Text(
-                    "این نسخه کاملاً آفلاین کار می‌کند. هر تغییری که می‌دهید با برچسب «منتظر ارسال» ذخیره می‌شود تا وقتی سرور اضافه شد، همه‌چیز بدون از دست رفتن داده همگام شود.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                SpacerH(10)
-                InfoRow("پروژه‌ها", Formatters.number(pending.projects))
-                InfoRow("واحدها", Formatters.number(pending.units))
-                InfoRow("مشتری‌ها", Formatters.number(pending.customers))
-                InfoRow("پیش‌فایل‌ها", Formatters.number(pending.preFiles))
-                InfoRow("اقساط", Formatters.number(pending.installments))
+            SectionCard(title = "آمار محلی") {
+                InfoRow("تعداد پروژه‌ها", Formatters.number(pending.projects))
+                InfoRow("تعداد واحدها", Formatters.number(pending.units))
+                InfoRow("تعداد فایل‌های پیش‌فروش", Formatters.number(pending.preFiles))
                 InfoRow("پیگیری‌ها", Formatters.number(pending.followUps))
-                SoftDivider()
-                InfoRow("جمع تغییرات معلق", Formatters.number(pending.total), emphasize = true)
-                InfoRow("آخرین همگام‌سازی", lastSyncAt.ifBlank { "—" })
-                SpacerH(10)
-                if (isSyncing) {
-                    CircularProgressIndicator(modifier = Modifier.fillMaxWidth(0.15f))
-                } else {
-                    OutlinedButton(
-                        onClick = { viewModel.syncNow() },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) { Text("تلاش برای همگام‌سازی") }
-                }
             }
         }
 
         item {
             SectionCard(title = "درباره برنامه") {
                 InfoRow("نام", "پیش‌فایل (Pish File)")
-                InfoRow("نسخه", "۰.۱.۰")
-                InfoRow("کارکرد", "ساماندهی پروژه‌ها، واحدها، مشتریان و پیش‌فایل‌های پیش‌فروش املاک")
+                InfoRow("نسخه", "۰.۲.۰")
+                InfoRow("کاربرد", "مدیریت و بایگانی فایل‌های پیش‌فروش مسکونی، تجاری و سهامی جهت ارائه به مشتریان و متقاضیان خرید")
                 SoftDivider()
                 Text(
-                    "برای گزارش خطا یا درخواست قابلیت جدید، یک Issue در مخزن گیت‌هاب پروژه ثبت کنید.",
+                    "سازگار با انواع مدل‌های فروش: واریزی و امتیاز، قیمت متری و سهامی.",
                     style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }

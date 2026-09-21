@@ -70,6 +70,10 @@ interface UnitDao {
     @Query("SELECT status, COUNT(*) as count FROM units WHERE deletedAt IS NULL AND (:projectId IS NULL OR projectId = :projectId) GROUP BY status")
     fun observeStatusCounts(projectId: String? = null): Flow<List<StatusCount>>
 
+    /** آخرین واحد آماده/آزاد ثبت‌شده برای داشبورد */
+    @Query("SELECT * FROM units WHERE deletedAt IS NULL AND status = 'AVAILABLE' ORDER BY createdAt DESC LIMIT 1")
+    fun observeLatestAvailable(): Flow<UnitEntity?>
+
     /** واحدهای آزاد با فیلتر متراژ و بودجه */
     @Query(
         """

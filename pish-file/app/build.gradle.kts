@@ -5,9 +5,25 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
+// امضای نسخه‌ی انتشار: اگر کلید و رمزها در ~/.gradle/gradle.properties (یا Secretهای CI)
+// تعریف شده باشند، نسخه‌ی release به‌صورت خودکار امضا می‌شود؛ در غیر این صورت بدون امضا می‌ماند.
+val releaseStoreFilePath: String? =
+    (project.findProperty("PISHFILE_STORE_FILE") as String?)?.takeIf { it.isNotBlank() }
+
 android {
     namespace = "ir.pishfile.app"
     compileSdk = 35
+
+    signingConfigs {
+        if (releaseStoreFilePath != null) {
+            create("release") {
+                storeFile = file(releaseStoreFilePath)
+                storePassword = project.findProperty("PISHFILE_STORE_PASSWORD") as String
+                keyAlias = project.findProperty("PISHFILE_KEY_ALIAS") as String
+                keyPassword = project.findProperty("PISHFILE_KEY_PASSWORD") as String
+            }
+        }
+    }
 
     defaultConfig {
         applicationId = "ir.pishfile.app"
@@ -35,8 +51,10 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            // امضای نسخه انتشار: کلید را در ~/.gradle/gradle.properties یا CI تعریف کنید
-            // signingConfig = signingConfigs.getByName("release")
+            // اگر کلید انتشار تعریف شده باشد، امضا می‌شود (محلی یا در GitHub Actions)
+            if (releaseStoreFilePath != null) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
 

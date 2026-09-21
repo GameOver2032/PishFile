@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -80,7 +81,7 @@ fun ProjectListScreen(
         if (projects.isEmpty()) {
             EmptyState(
                 title = "پروژه‌ای ثبت نشده",
-                subtitle = "برای شروع، یک پروژه‌ی ساختمانی بسازید تا واحدها و پیش‌فایل‌ها به آن متصل شوند",
+                subtitle = "برای شروع، یک پروژه‌ی ساختمانی بسازید تا فایل‌های پیش‌فروش و واحدها به آن متصل شوند",
                 icon = { Icon(Icons.Filled.Apartment, contentDescription = null) },
             )
         } else {
@@ -103,7 +104,7 @@ fun ProjectListScreen(
     pendingDelete?.let { project ->
         ConfirmDialog(
             title = "حذف پروژه",
-            message = "«${project.name}» و همه‌ی واحدهای آن حذف می‌شوند. این کار قابل بازگشت نیست.",
+            message = "«${project.name}» و همه‌ی پیش‌فروش‌های متصل به آن حذف می‌شوند.",
             onConfirm = { viewModel.delete(project.id) },
             onDismiss = { pendingDelete = null },
         )
@@ -147,11 +148,8 @@ private fun ProjectCard(
             }
             SpacerH(8)
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                StatusChip(Constants.projectPricingModelLabel(project.pricingModel), MaterialTheme.colorScheme.primary)
                 StatusChip(Constants.projectPhaseLabel(project.phase), MaterialTheme.colorScheme.tertiary)
-                StatusChip(
-                    "پیشرفت ${Formatters.percent(project.progressPercent)}",
-                    MaterialTheme.colorScheme.primary,
-                )
                 project.unitCount?.let { StatusChip("${Formatters.number(it)} واحد", MaterialTheme.colorScheme.secondary) }
             }
             SpacerH(8)
@@ -161,11 +159,29 @@ private fun ProjectCard(
             )
             SpacerH(6)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(
-                    "قیمت فروش هر متر: ${Formatters.amountWithUnit(project.salePricePerMeter)}",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                when (project.pricingModel) {
+                    Constants.PRICING_DEPOSIT_BONUS -> {
+                        Text(
+                            "واریزی پیش‌فرض: ${Formatters.amountShort(project.defaultDepositAmount)} تومان",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Constants.PRICING_SHARE -> {
+                        Text(
+                            "سهم: ${Formatters.number(project.shareMeterArea?.toInt())} متری • هر سهم ${Formatters.amountShort(project.sharePrice)}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    else -> {
+                        Text(
+                            "قیمت متری: ${Formatters.amountWithUnit(project.salePricePerMeter)}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
                 project.deliveryDate?.let {
                     Text(
                         "تحویل: ${Formatters.toPersianDigits(it)}",
@@ -186,7 +202,6 @@ fun ProjectEditScreen(
     viewModel: ProjectEditViewModel = viewModel(factory = AppViewModelProvider.Factory),
 ) {
     if (projectId == null) viewModel.markNew() else viewModel.load(projectId)
-
     val form = viewModel.form
 
     LazyColumn(
@@ -195,13 +210,168 @@ fun ProjectEditScreen(
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         item {
-            SectionCard(title = "مشخصات اصلی") {
-                FormFieldsBlock(
-                    form = form,
-                    update = viewModel::update,
+            SectionCard(title = "مشخصات اصلی پروژه") {
+                ir.pishfile.app.ui.components.FormTextField(
+                    value = form.name,
+                    onValueChange = { v -> viewModel.update { it.copy(name = v) } },
+                    label = "نام پروژه *",
+                )
+                SpacerH(8)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ir.pishfile.app.ui.components.FormTextField(
+                        value = form.code,
+                        onValueChange = { v -> viewModel.update { it.copy(code = v) } },
+                        label = "کد پروژه",
+                        modifier = Modifier.weight(1f),
+                    )
+                    ir.pishfile.app.ui.components.FormTextField(
+                        value = form.projectType,
+                        onValueChange = { v -> viewModel.update { it.copy(projectType = v) } },
+                        label = "نوع پروژه",
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                SpacerH(8)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ir.pishfile.app.ui.components.FormTextField(
+                        value = form.city,
+                        onValueChange = { v -> viewModel.update { it.copy(city = v) } },
+                        label = "شهر",
+                        modifier = Modifier.weight(1f),
+                    )
+                    ir.pishfile.app.ui.components.FormTextField(
+                        value = form.district,
+                        onValueChange = { v -> viewModel.update { it.copy(district = v) } },
+                        label = "محله",
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                SpacerH(8)
+                ir.pishfile.app.ui.components.FormTextField(
+                    value = form.address,
+                    onValueChange = { v -> viewModel.update { it.copy(address = v) } },
+                    label = "نشانی پروژه",
+                    singleLine = false,
+                    minLines = 2,
                 )
             }
         }
+
+        // مدل قیمت‌گذاری پیش‌فرض پروژه (واریزی/امتیاز، متری، سهامی)
+        item {
+            SectionCard(
+                title = "مدل قیمت‌گذاری و شرایط پیش‌فرض پروژه",
+                subtitle = "این شرایط هنگام ثبت فایل پیش‌فروش جدید برای این پروژه خودکار پر می‌شوند",
+            ) {
+                Text("مدل قیمت‌گذاری پروژه:", style = MaterialTheme.typography.bodySmall)
+                SpacerH(6)
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    FilterChip(
+                        selected = form.pricingModel == Constants.PRICING_DEPOSIT_BONUS,
+                        onClick = { viewModel.update { it.copy(pricingModel = Constants.PRICING_DEPOSIT_BONUS) } },
+                        label = { Text("واریزی و امتیاز") },
+                    )
+                    FilterChip(
+                        selected = form.pricingModel == Constants.PRICING_METER,
+                        onClick = { viewModel.update { it.copy(pricingModel = Constants.PRICING_METER) } },
+                        label = { Text("قیمت متری") },
+                    )
+                    FilterChip(
+                        selected = form.pricingModel == Constants.PRICING_SHARE,
+                        onClick = { viewModel.update { it.copy(pricingModel = Constants.PRICING_SHARE) } },
+                        label = { Text("سهامی") },
+                    )
+                }
+
+                SpacerH(10)
+
+                when (form.pricingModel) {
+                    Constants.PRICING_DEPOSIT_BONUS -> {
+                        MoneyField(
+                            value = form.defaultDepositAmount,
+                            onValueChange = { v -> viewModel.update { it.copy(defaultDepositAmount = v) } },
+                            label = "مبلغ واریزی پیش‌فرض پروژه تا امروز",
+                        )
+                    }
+                    Constants.PRICING_SHARE -> {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            NumberField(
+                                value = form.shareMeterArea,
+                                onValueChange = { v -> viewModel.update { it.copy(shareMeterArea = v) } },
+                                label = "متراژ هر سهم",
+                                suffix = "م²",
+                                decimal = true,
+                                modifier = Modifier.weight(1f),
+                            )
+                            MoneyField(
+                                value = form.sharePrice,
+                                onValueChange = { v -> viewModel.update { it.copy(sharePrice = v) } },
+                                label = "قیمت هر سهم",
+                                modifier = Modifier.weight(1.5f),
+                            )
+                        }
+                    }
+                    else -> { // METER
+                        MoneyField(
+                            value = form.salePricePerMeter,
+                            onValueChange = { v -> viewModel.update { it.copy(salePricePerMeter = v) } },
+                            label = "قیمت پایه هر مترمربع",
+                        )
+                    }
+                }
+            }
+        }
+
+        item {
+            SectionCard(title = "پیشرفت و زمان‌بندی") {
+                DropdownField(
+                    label = "مرحله پروژه",
+                    options = Constants.projectPhases.map { Constants.projectPhaseLabel(it) },
+                    selected = Constants.projectPhaseLabel(form.phase),
+                    onSelect = { label ->
+                        val code = Constants.projectPhases.firstOrNull { Constants.projectPhaseLabel(it) == label } ?: form.phase
+                        viewModel.update { it.copy(phase = code) }
+                    },
+                )
+                SpacerH(8)
+                NumberField(
+                    value = form.progressPercent,
+                    onValueChange = { v -> viewModel.update { it.copy(progressPercent = v) } },
+                    label = "درصد پیشرفت فیزیکی",
+                    suffix = "٪",
+                )
+                SpacerH(8)
+                JalaliDateField(
+                    value = form.deliveryDate,
+                    onValueChange = { v -> viewModel.update { it.copy(deliveryDate = v) } },
+                    label = "تاریخ تقریبی تحویل پروژه",
+                )
+            }
+        }
+
+        item {
+            SectionCard(title = "توضیحات و امکانات") {
+                ir.pishfile.app.ui.components.MultiSelectChips(
+                    label = "امکانات پروژه",
+                    options = Constants.facilities,
+                    selected = form.facilities.split(",").filter { it.isNotBlank() }.toSet(),
+                    onToggle = { item ->
+                        val current = form.facilities.split(",").filter { it.isNotBlank() }.toMutableSet()
+                        if (!current.add(item)) current.remove(item)
+                        viewModel.update { it.copy(facilities = current.joinToString(",")) }
+                    },
+                )
+                SpacerH(8)
+                ir.pishfile.app.ui.components.FormTextField(
+                    value = form.description,
+                    onValueChange = { v -> viewModel.update { it.copy(description = v) } },
+                    label = "توضیحات پروژه جهت ارائه به مشتریان",
+                    singleLine = false,
+                    minLines = 3,
+                )
+            }
+        }
+
         item {
             Button(
                 onClick = { viewModel.save { id -> onSaved(id) } },
@@ -211,199 +381,6 @@ fun ProjectEditScreen(
         item {
             OutlinedButton(onClick = onBack, modifier = Modifier.fillMaxWidth()) { Text("انصراف") }
         }
-    }
-}
-
-@Composable
-private fun FormFieldsBlock(form: ProjectForm, update: ((ProjectForm) -> ProjectForm) -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        ir.pishfile.app.ui.components.FormTextField(
-            value = form.name,
-            onValueChange = { v -> update { it.copy(name = v) } },
-            label = "نام پروژه *",
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            ir.pishfile.app.ui.components.FormTextField(
-                value = form.code,
-                onValueChange = { v -> update { it.copy(code = v) } },
-                label = "کد پروژه",
-                modifier = Modifier.weight(1f),
-            )
-            ir.pishfile.app.ui.components.FormTextField(
-                value = form.projectType,
-                onValueChange = { v -> update { it.copy(projectType = v) } },
-                label = "نوع پروژه",
-                modifier = Modifier.weight(1f),
-            )
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            ir.pishfile.app.ui.components.FormTextField(
-                value = form.city,
-                onValueChange = { v -> update { it.copy(city = v) } },
-                label = "شهر",
-                modifier = Modifier.weight(1f),
-            )
-            ir.pishfile.app.ui.components.FormTextField(
-                value = form.district,
-                onValueChange = { v -> update { it.copy(district = v) } },
-                label = "محله",
-                modifier = Modifier.weight(1f),
-            )
-        }
-        ir.pishfile.app.ui.components.FormTextField(
-            value = form.address,
-            onValueChange = { v -> update { it.copy(address = v) } },
-            label = "نشانی",
-            singleLine = false,
-            minLines = 2,
-        )
-
-        ir.pishfile.app.ui.components.SoftDivider()
-        Text("مشخصات فنی", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
-
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            NumberField(
-                value = form.landArea,
-                onValueChange = { v -> update { it.copy(landArea = v) } },
-                label = "مساحت زمین",
-                suffix = "م²",
-                decimal = true,
-                modifier = Modifier.weight(1f),
-            )
-            NumberField(
-                value = form.totalBuiltArea,
-                onValueChange = { v -> update { it.copy(totalBuiltArea = v) } },
-                label = "زیربنا",
-                suffix = "م²",
-                decimal = true,
-                modifier = Modifier.weight(1f),
-            )
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            NumberField(
-                value = form.floorCount,
-                onValueChange = { v -> update { it.copy(floorCount = v) } },
-                label = "تعداد طبقات",
-                modifier = Modifier.weight(1f),
-            )
-            NumberField(
-                value = form.unitCount,
-                onValueChange = { v -> update { it.copy(unitCount = v) } },
-                label = "تعداد واحد",
-                modifier = Modifier.weight(1f),
-            )
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            NumberField(
-                value = form.parkingCount,
-                onValueChange = { v -> update { it.copy(parkingCount = v) } },
-                label = "پارکینگ",
-                modifier = Modifier.weight(1f),
-            )
-            NumberField(
-                value = form.elevatorCount,
-                onValueChange = { v -> update { it.copy(elevatorCount = v) } },
-                label = "آسانسور",
-                modifier = Modifier.weight(1f),
-            )
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            ir.pishfile.app.ui.components.FormTextField(
-                value = form.structureType,
-                onValueChange = { v -> update { it.copy(structureType = v) } },
-                label = "نوع سازه",
-                modifier = Modifier.weight(1f),
-            )
-            ir.pishfile.app.ui.components.FormTextField(
-                value = form.heatingSystem,
-                onValueChange = { v -> update { it.copy(heatingSystem = v) } },
-                label = "گرمایش/سرمایش",
-                modifier = Modifier.weight(1f),
-            )
-        }
-
-        ir.pishfile.app.ui.components.SoftDivider()
-        Text("مالی و زمان‌بندی", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
-
-        MoneyField(
-            value = form.salePricePerMeter,
-            onValueChange = { v -> update { it.copy(salePricePerMeter = v) } },
-            label = "قیمت فروش هر مترمربع",
-        )
-        MoneyField(
-            value = form.costPerMeter,
-            onValueChange = { v -> update { it.copy(costPerMeter = v) } },
-            label = "قیمت تمام‌شده هر مترمربع",
-        )
-        MoneyField(
-            value = form.totalBudget,
-            onValueChange = { v -> update { it.copy(totalBudget = v) } },
-            label = "بودجه کل پروژه",
-        )
-        DropdownField(
-            label = "مرحله پروژه",
-            options = Constants.projectPhases.map { Constants.projectPhaseLabel(it) },
-            selected = Constants.projectPhaseLabel(form.phase),
-            onSelect = { label ->
-                val code = Constants.projectPhases.firstOrNull { Constants.projectPhaseLabel(it) == label } ?: form.phase
-                update { it.copy(phase = code) }
-            },
-        )
-        NumberField(
-            value = form.progressPercent,
-            onValueChange = { v -> update { it.copy(progressPercent = v) } },
-            label = "درصد پیشرفت فیزیکی",
-            suffix = "٪",
-        )
-        JalaliDateField(
-            value = form.startDate,
-            onValueChange = { v -> update { it.copy(startDate = v) } },
-            label = "تاریخ شروع",
-        )
-        JalaliDateField(
-            value = form.deliveryDate,
-            onValueChange = { v -> update { it.copy(deliveryDate = v) } },
-            label = "تاریخ تحویل",
-        )
-
-        ir.pishfile.app.ui.components.SoftDivider()
-        Text("مجوزها", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
-        ir.pishfile.app.ui.components.FormTextField(
-            value = form.permitNumber,
-            onValueChange = { v -> update { it.copy(permitNumber = v) } },
-            label = "شماره پروانه ساخت",
-        )
-        JalaliDateField(
-            value = form.permitIssueDate,
-            onValueChange = { v -> update { it.copy(permitIssueDate = v) } },
-            label = "تاریخ صدور پروانه",
-            quickMonths = listOf(12),
-        )
-        ir.pishfile.app.ui.components.FormTextField(
-            value = form.landDeedNumber,
-            onValueChange = { v -> update { it.copy(landDeedNumber = v) } },
-            label = "شماره سند زمین",
-        )
-
-        ir.pishfile.app.ui.components.SoftDivider()
-        Text("امکانات و توضیحات", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
-        ir.pishfile.app.ui.components.MultiSelectChips(
-            label = "امکانات پروژه",
-            options = Constants.facilities,
-            selected = form.facilities.split(",").filter { it.isNotBlank() }.toSet(),
-            onToggle = { item ->
-                val current = form.facilities.split(",").filter { it.isNotBlank() }.toMutableSet()
-                if (!current.add(item)) current.remove(item)
-                update { it.copy(facilities = current.joinToString(",")) }
-            },
-        )
-        ir.pishfile.app.ui.components.FormTextField(
-            value = form.description,
-            onValueChange = { v -> update { it.copy(description = v) } },
-            label = "توضیحات",
-            singleLine = false,
-            minLines = 3,
-        )
     }
 }
 
@@ -422,8 +399,6 @@ fun ProjectDetailScreen(
     val project by viewModel.project.collectAsStateWithLifecycle()
     val units by viewModel.units.collectAsStateWithLifecycle()
     val preFiles by viewModel.preFiles.collectAsStateWithLifecycle()
-    val totalSales by viewModel.totalSales.collectAsStateWithLifecycle()
-    val avgPrice by viewModel.averagePricePerMeter.collectAsStateWithLifecycle()
     var showDelete by remember { mutableStateOf(false) }
 
     val current = project ?: return
@@ -436,8 +411,9 @@ fun ProjectDetailScreen(
         item {
             SectionCard(title = current.name, subtitle = listOfNotNull(current.city, current.district).joinToString(" • ")) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    StatusChip(Constants.projectPhaseLabel(current.phase), MaterialTheme.colorScheme.tertiary)
+                    StatusChip(Constants.projectPricingModelLabel(current.pricingModel), MaterialTheme.colorScheme.primary)
                     SpacerH(0)
+                    StatusChip("مرحله: ${Constants.projectPhaseLabel(current.phase)}", MaterialTheme.colorScheme.tertiary)
                     Row(Modifier.weight(1f), horizontalArrangement = Arrangement.End) {
                         IconButton(onClick = onEdit) { Icon(Icons.Filled.Edit, contentDescription = "ویرایش") }
                         IconButton(onClick = { showDelete = true }) {
@@ -451,48 +427,88 @@ fun ProjectDetailScreen(
                     modifier = Modifier.fillMaxWidth(),
                 )
                 SpacerH(10)
-                InfoRow("تعداد واحد", Formatters.number(current.unitCount))
-                InfoRow("تعداد طبقات", Formatters.number(current.floorCount))
-                InfoRow("مساحت زمین", current.landArea?.let { "${Formatters.number(it.toInt())} مترمربع" })
-                InfoRow("زیربنا", current.totalBuiltArea?.let { "${Formatters.number(it.toInt())} مترمربع" })
-                InfoRow("سازه", current.structureType)
-                InfoRow("پروانه ساخت", current.permitNumber)
-                InfoRow("شماره سند", current.landDeedNumber)
-                InfoRow("شروع", current.startDate?.let { Formatters.toPersianDigits(it) })
-                InfoRow("تحویل", current.deliveryDate?.let { Formatters.toPersianDigits(it) })
-                InfoRow("نشانی", current.address, emphasize = false)
+                when (current.pricingModel) {
+                    Constants.PRICING_DEPOSIT_BONUS -> {
+                        InfoRow("مدل فروش", "واریزی و امتیاز")
+                        InfoRow("واریزی پیش‌فرض تا امروز", Formatters.amountWithUnit(current.defaultDepositAmount), emphasize = true)
+                    }
+                    Constants.PRICING_SHARE -> {
+                        InfoRow("مدل فروش", "سهامی")
+                        InfoRow("متراژ هر سهم", current.shareMeterArea?.let { "${Formatters.number(it.toInt())} م²" })
+                        InfoRow("قیمت هر سهم", Formatters.amountWithUnit(current.sharePrice), emphasize = true)
+                    }
+                    else -> {
+                        InfoRow("مدل فروش", "قیمت متری")
+                        InfoRow("قیمت فروش هر متر", Formatters.amountWithUnit(current.salePricePerMeter), emphasize = true)
+                    }
+                }
+                InfoRow("تحویل پروژه", current.deliveryDate?.let { Formatters.toPersianDigits(it) })
+                InfoRow("نشانی", current.address)
+                InfoRow("امکانات", current.facilities?.replace(",", " • "))
                 InfoRow("توضیحات", current.description)
             }
         }
 
         item {
-            SectionCard(title = "خلاصه فروش") {
-                InfoRow("واحدهای پیش‌فروش‌شده", "${Formatters.number(preFiles.size)} واحد")
-                InfoRow("ارزش قراردادها", Formatters.amountWithUnit(totalSales))
-                InfoRow("میانگین قیمت هر متر", Formatters.amountWithUnit(avgPrice?.toLong()))
-                InfoRow("قیمت فروش پروژه", Formatters.amountWithUnit(current.salePricePerMeter), emphasize = true)
+            SectionCard(
+                title = "فایل‌های پیش‌فروش این پروژه (${Formatters.number(preFiles.size)})",
+            ) {
+                if (preFiles.isEmpty()) {
+                    Text("هنوز فایل پیش‌فروشی برای این پروژه ثبت نشده است.", style = MaterialTheme.typography.bodySmall)
+                } else {
+                    preFiles.forEach { row ->
+                        Card(
+                            onClick = { onOpenPreFile(row.preFile.id) },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                        ) {
+                            Column(Modifier.padding(10.dp)) {
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                    Text(
+                                        "${row.preFile.draftNumber} • ${row.unitTitle ?: "بدون واحد"}",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Bold,
+                                    )
+                                    StatusChip(
+                                        Constants.preFileStatusLabel(row.preFile.status),
+                                        ir.pishfile.app.ui.screens.dashboard.preFileStatusColor(row.preFile.status),
+                                    )
+                                }
+                                Text(
+                                    listOfNotNull(
+                                        row.preFile.ownerName?.let { "مالک: $it" },
+                                        "مبلغ: ${Formatters.amountShort(row.preFile.computedTotal)} تومان",
+                                    ).joinToString(" • "),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                        SpacerH(6)
+                    }
+                }
             }
         }
 
         item {
             SectionCard(
-                title = "واحدها (${Formatters.number(units.size)})",
+                title = "واحدهای پروژه (${Formatters.number(units.size)})",
                 trailing = {
                     IconButton(onClick = onAddUnit) { Icon(Icons.Filled.Add, contentDescription = "افزودن واحد") }
                 },
             ) {
                 if (units.isEmpty()) {
                     Text(
-                        "هنوز واحدی ثبت نشده — با دکمه + واحد اضافه کنید یا از «ساخت گروهی» استفاده کنید",
+                        "هنوز واحدی ثبت نشده — با دکمه + واحد اضافه کنید",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 } else {
-                    units.take(12).forEach { unit ->
+                    units.forEach { unit ->
                         Row(
                             Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 6.dp),
+                                .padding(vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Column(Modifier.weight(1f)) {
@@ -501,7 +517,6 @@ fun ProjectDetailScreen(
                                     listOfNotNull(
                                         unit.grossArea?.let { "${Formatters.number(it.toInt())} م²" },
                                         unit.direction,
-                                        Constants.unitTypeLabel(unit.unitType),
                                     ).joinToString(" • "),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -513,41 +528,6 @@ fun ProjectDetailScreen(
                             )
                             IconButton(onClick = { onOpenUnit(unit.id) }) {
                                 Icon(Icons.Filled.Note, contentDescription = "جزئیات")
-                            }
-                        }
-                    }
-                    if (units.size > 12) {
-                        Text(
-                            "و ${Formatters.number(units.size - 12)} واحد دیگر…",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-            }
-        }
-
-        item {
-            SectionCard(title = "پیش‌فایل‌های پروژه (${Formatters.number(preFiles.size)})") {
-                if (preFiles.isEmpty()) {
-                    Text("پیش‌فایلی برای این پروژه ثبت نشده", style = MaterialTheme.typography.bodySmall)
-                } else {
-                    preFiles.take(10).forEach { row ->
-                        Card(
-                            onClick = { onOpenPreFile(row.preFile.id) },
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
-                        ) {
-                            Column(Modifier.padding(10.dp)) {
-                                Text(
-                                    "${row.preFile.draftNumber} • ${row.customerName ?: "—"}",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                )
-                                Text(
-                                    "${row.unitTitle ?: ""} • ${Formatters.amountShort(row.preFile.effectivePrice)} تومان",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
                             }
                         }
                     }
@@ -563,7 +543,7 @@ fun ProjectDetailScreen(
     if (showDelete) {
         ConfirmDialog(
             title = "حذف پروژه",
-            message = "همه‌ی واحدها و پیش‌فایل‌های این پروژه حذف می‌شوند.",
+            message = "پروژه و همه‌ی فایل‌های پیش‌فروش آن حذف شوند؟",
             onConfirm = { viewModel.delete(onBack) },
             onDismiss = { showDelete = false },
         )

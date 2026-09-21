@@ -21,6 +21,8 @@ class UnitRepository(private val dao: UnitDao) {
 
     fun observeCountByStatus(status: String): Flow<Int> = dao.observeCountByStatus(status)
 
+    fun observeLatestAvailable(): Flow<UnitEntity?> = dao.observeLatestAvailable()
+
     fun observeStatusCounts(projectId: String? = null): Flow<List<StatusCount>> = dao.observeStatusCounts(projectId)
 
     fun findAvailable(minArea: Double?, maxArea: Double?, maxPrice: Long?): Flow<List<UnitEntity>> =

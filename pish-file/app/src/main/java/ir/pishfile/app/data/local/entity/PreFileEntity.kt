@@ -8,8 +8,11 @@ import androidx.room.PrimaryKey
 import java.util.UUID
 
 /**
- * پیش‌فایل — برگه‌ی اصلی توافق پیش‌فروش بین مشتری و واحد.
- * همه‌ی شرایط مالی (پیش‌پرداخت، تخفیف، قسط‌بندی، تنظیم سند) این‌جا جمع می‌شود.
+ * فایل پیش‌فروش.
+ * شامل مشخصات مالی بر اساس ۳ مدل:
+ *  1) واریزی و امتیاز (واریزی تا امروز + مبلغ امتیاز = کل پرداختی خریدار)
+ *  2) متری (قیمت هر متر × متراژ = قیمت کل)
+ *  3) سهامی (متراژ هر سهم × تعداد سهم، قیمت هر سهم × تعداد سهم)
  */
 @Entity(
     tableName = "pre_files",
@@ -25,16 +28,10 @@ import java.util.UUID
             parentColumns = ["id"],
             childColumns = ["unitId"],
             onDelete = ForeignKey.SET_NULL
-        ),
-        ForeignKey(
-            entity = CustomerEntity::class,
-            parentColumns = ["id"],
-            childColumns = ["customerId"],
-            onDelete = ForeignKey.SET_NULL
         )
     ],
     indices = [
-        Index("projectId"), Index("unitId"), Index("customerId"),
+        Index("projectId"), Index("unitId"),
         Index("status"), Index("draftNumber"), Index("remoteId"), Index("syncState")
     ]
 )
@@ -42,36 +39,110 @@ data class PreFileEntity(
     @PrimaryKey
     val id: String = UUID.randomUUID().toString(),
 
-    /** شماره پیش‌نویس — مثل PF-1405-0012 */
+    /** شماره فایل پیش‌فروش (PF-1405-0001) */
     @ColumnInfo(name = "draftNumber")
     val draftNumber: String,
 
-    /** تاریخ تنظیم پیش‌فایل (شمسی: 1405/06/29) */
+    /** تاریخ ثبت فایل (شمسی) */
     @ColumnInfo(name = "draftDate")
     val draftDate: String,
 
-    // --- ارتباط‌ها ---
+    // --- ارتباط پروژه و واحد ---
     @ColumnInfo(name = "projectId")
     val projectId: String,
 
     @ColumnInfo(name = "unitId")
     val unitId: String? = null,
 
-    @ColumnInfo(name = "customerId")
-    val customerId: String? = null,
+    /** مشخصات مالک / سپارنده‌ی فایل */
+    @ColumnInfo(name = "ownerName")
+    val ownerName: String? = null,
 
-    /** فروشنده/کارشناس مسئول */
-    @ColumnInfo(name = "salesAgentName")
-    val salesAgentName: String? = null,
+    @ColumnInfo(name = "ownerPhone")
+    val ownerPhone: String? = null,
 
-    @ColumnInfo(name = "salesAgentPhone")
-    val salesAgentPhone: String? = null,
+    // --- مدل قیمت‌گذاری: METER / DEPOSIT_BONUS / SHARE ---
+    @ColumnInfo(name = "pricingModel")
+    val pricingModel: String = "METER",
 
-    /** کد پیگیری/رزرو */
-    @ColumnInfo(name = "trackingCode")
-    val trackingCode: String? = null,
+    // --- ۱) مدل واریزی و امتیاز ---
+    /** مبلغ واریزی پروژه تا امروز */
+    @ColumnInfo(name = "depositAmount")
+    val depositAmount: Long? = null,
 
-    // --- اسنپ‌شات مشخصات واحد در لحظه تنظیم (تاریخی، در برابر تغییر واحد) ---
+    /** مبلغ امتیاز (سود پروژه) */
+    @ColumnInfo(name = "bonusAmount")
+    val bonusAmount: Long? = null,
+
+    // --- ۲) مدل متری ---
+    /** قیمت هر مترمربع */
+    @ColumnInfo(name = "pricePerMeter")
+    val pricePerMeter: Long? = null,
+
+    /** متراژ واحد (مترمربع) */
+    @ColumnInfo(name = "meterArea")
+    val meterArea: Double? = null,
+
+    // --- ۳) مدل سهامی ---
+    /** متراژ هر سهم */
+    @ColumnInfo(name = "shareMeterArea")
+    val shareMeterArea: Double? = null,
+
+    /** تعداد سهم */
+    @ColumnInfo(name = "shareCount")
+    val shareCount: Int? = null,
+
+    /** قیمت هر سهم */
+    @ColumnInfo(name = "sharePrice")
+    val sharePrice: Long? = null,
+
+    // --- مبلغ کل (پرداختی کل برای خرید فایل) ---
+    @ColumnInfo(name = "totalPrice")
+    val totalPrice: Long = 0L,
+
+    // --- رتبه‌بندی پروژه/فایل ---
+    @ColumnInfo(name = "hasRanking")
+    val hasRanking: Boolean = false,
+
+    @ColumnInfo(name = "ranking")
+    val ranking: String? = null,
+
+    // --- شرایط فروش (امکان تیک‌گذاری نقد، شرایطی، تهاتر) ---
+    @ColumnInfo(name = "saleConditionCash")
+    val saleConditionCash: Boolean = true,
+
+    @ColumnInfo(name = "saleConditionInstallment")
+    val saleConditionInstallment: Boolean = false,
+
+    @ColumnInfo(name = "saleConditionExchange")
+    val saleConditionExchange: Boolean = false,
+
+    /** توضیحات شرایط فروش (مثلاً در صورت تهاتر با چه چیزهایی تهاتر می‌کند) */
+    @ColumnInfo(name = "saleConditionNotes")
+    val saleConditionNotes: String? = null,
+
+    // --- اطلاعات اقساط پرونده ---
+    /** تعداد کل اقساط */
+    @ColumnInfo(name = "installmentCount")
+    val installmentCount: Int? = null,
+
+    /** تعداد اقساط مانده */
+    @ColumnInfo(name = "remainingInstallmentsCount")
+    val remainingInstallmentsCount: Int? = null,
+
+    /** مبلغ هر قسط */
+    @ColumnInfo(name = "installmentAmount")
+    val installmentAmount: Long? = null,
+
+    /** دوره‌ی پرداخت اقساط (مثلاً ماهانه، سه ماهه) */
+    @ColumnInfo(name = "installmentPeriod")
+    val installmentPeriod: String? = null,
+
+    /** تاریخ سررسید قسط پیش‌رو */
+    @ColumnInfo(name = "nextInstallmentDueDate")
+    val nextInstallmentDueDate: String? = null,
+
+    // --- اسنپ‌شات واحد ---
     @ColumnInfo(name = "unitSnapshotBlock")
     val unitBlock: String? = null,
 
@@ -81,141 +152,21 @@ data class PreFileEntity(
     @ColumnInfo(name = "unitSnapshotFloor")
     val unitFloor: Int? = null,
 
-    @ColumnInfo(name = "unitSnapshotArea")
-    val unitArea: Double? = null,
+    // --- وضعیت فایل ---
+    /** DRAFT (پیش‌نویس) / URGENT (فروش فوری) / NORMAL (غیر فوری) / WITHDRAWN (منصرف از فروش) */
+    val status: String = "DRAFT",
 
-    // --- شرایط مالی ---
-    /** مبلغ کل به عدد */
-    @ColumnInfo(name = "totalPrice")
-    val totalPrice: Long,
-
-    /** قیمت هر مترمربع در لحظه توافق */
-    @ColumnInfo(name = "pricePerMeter")
-    val pricePerMeter: Long? = null,
-
-    /** تخفیف */
-    val discount: Long? = null,
-
-    /** مبلغ بعد از تخفیف (نهایی) */
-    @ColumnInfo(name = "finalPrice")
-    val finalPrice: Long? = null,
-
-    /** مبلغ پیش‌پرداخت */
-    @ColumnInfo(name = "prepayment")
-    val prepayment: Long? = null,
-
-    /** مبلغ دریافتی تا این لحظه */
-    @ColumnInfo(name = "paidAmount")
-    val paidAmount: Long = 0,
-
-    /** مانده */
-    @ColumnInfo(name = "remainingAmount")
-    val remainingAmount: Long? = null,
-
-    /** تعداد اقساط */
-    @ColumnInfo(name = "installmentCount")
-    val installmentCount: Int? = null,
-
-    /** مبلغ هر قسط */
-    @ColumnInfo(name = "installmentAmount")
-    val installmentAmount: Long? = null,
-
-    /** دوره‌ی پرداخت قسط: ماهانه، دو ماهه، فصلی، سالانه */
-    @ColumnInfo(name = "installmentPeriod")
-    val installmentPeriod: String? = null,
-
-    /** تاریخ شروع اقساط */
-    @ColumnInfo(name = "installmentStartDate")
-    val installmentStartDate: String? = null,
-
-    /** نوع پرداخت: نقدی، اقساطی، تهاتر، تسهیلات، ترکیبی */
-    @ColumnInfo(name = "paymentType")
-    val paymentType: String = "INSTALLMENT",
-
-    // --- تعهدات طرفین ---
-    /** تعهد فروشنده: زمان تحویل، جریمه تأخیر... */
-    @ColumnInfo(name = "sellerCommitment")
-    val sellerCommitment: String? = null,
-
-    /** تعهد خریدار */
-    @ColumnInfo(name = "buyerCommitment")
-    val buyerCommitment: String? = null,
-
-    /** جریمه عدم انجام تعهدات */
-    @ColumnInfo(name = "penaltyClause")
-    val penaltyClause: String? = null,
-
-    /** شرایط فسخ و انصراف */
-    @ColumnInfo(name = "cancellationTerms")
-    val cancellationTerms: String? = null,
-
-    /** تنظیم سند رسمی — تاریخ توافقی */
-    @ColumnInfo(name = "deedDate")
-    val deedDate: String? = null,
-
-    /** محل تنظیم سند: دفترخانه */
-    @ColumnInfo(name = "deedOffice")
-    val deedOffice: String? = null,
-
-    /** تاریخ تحویل توافقی واحد */
+    /** تاریخ تحویل تقریبی */
     @ColumnInfo(name = "deliveryDate")
     val deliveryDate: String? = null,
 
-    // --- ضمانت‌ها ---
-    /** ملک مورد معامله در رهن/بازداشت است؟ */
-    @ColumnInfo(name = "isUnitMortgaged")
-    val isUnitMortgaged: Boolean = false,
-
-    /** ضامن / چک / سفته */
-    @ColumnInfo(name = "guaranteeType")
-    val guaranteeType: String? = null,
-
-    /** تعداد چک دریافتی */
-    @ColumnInfo(name = "chequeCount")
-    val chequeCount: Int? = null,
-
-    /** مبلغ چک‌ها */
-    @ColumnInfo(name = "chequeAmount")
-    val chequeAmount: Long? = null,
-
-    // --- وضعیت ---
-    /** DRAFT / RESERVED / PENDING_PAYMENT / CONFIRMED / COMPLETED / CANCELED */
-    val status: String = "DRAFT",
-
-    /** تاریخ قطعی شدن */
-    @ColumnInfo(name = "confirmedDate")
-    val confirmedDate: String? = null,
-
-    /** تاریخ لغو */
-    @ColumnInfo(name = "cancelDate")
-    val cancelDate: String? = null,
-
-    /** دلیل لغو */
-    @ColumnInfo(name = "cancelReason")
-    val cancelReason: String? = null,
-
-    /** در صورت لغو، مبلغ کسر شده */
-    @ColumnInfo(name = "cancelPenaltyAmount")
-    val cancelPenaltyAmount: Long? = null,
-
-    // --- پرداخت‌های داخل قرارداد ---
-    /** از چه پرداخت‌هایی در این قرارداد استفاده شده (مثلاً تهاتر خودرو) */
-    @ColumnInfo(name = "exchangeDetails")
-    val exchangeDetails: String? = null,
-
+    /** توضیحات و یادداشت کلی */
     @ColumnInfo(name = "notes")
     val notes: String? = null,
 
-    /** اسناد پیوست (مسیر فایل‌ها، جدا شده با کاما) */
-    @ColumnInfo(name = "documentPaths")
-    val documentPaths: String? = null,
-
-    @ColumnInfo(name = "contractPhotoPath")
-    val contractPhotoPath: String? = null,
-
     val isFavorite: Boolean = false,
 
-    // --- میدان‌های آماده برای همگام‌سازی ---
+    // --- فیلدهای سیستمی و همگام‌سازی ---
     @ColumnInfo(name = "remoteId")
     val remoteId: String? = null,
 
@@ -234,18 +185,33 @@ data class PreFileEntity(
     @ColumnInfo(name = "deletedAt")
     val deletedAt: Long? = null,
 ) {
-    /** مبلغ نهایی مورد توافق */
-    val effectivePrice: Long
-        get() = finalPrice ?: (totalPrice - (discount ?: 0L))
-
-    /** مانده قابل پرداخت */
-    val dueAmount: Long
-        get() = remainingAmount ?: (effectivePrice - paidAmount)
-
-    val progressPercent: Int
-        get() {
-            val total = effectivePrice
-            if (total <= 0) return 0
-            return ((paidAmount.toDouble() / total) * 100).toInt().coerceIn(0, 100)
+    /** محاسبه مبلغ کل پرداختی بر اساس مدل انتخابی */
+    val computedTotal: Long
+        get() = when (pricingModel) {
+            "DEPOSIT_BONUS" -> (depositAmount ?: 0L) + (bonusAmount ?: 0L)
+            "SHARE" -> {
+                val count = shareCount ?: 1
+                val price = sharePrice ?: 0L
+                count * price
+            }
+            else -> { // METER
+                if (totalPrice > 0) totalPrice
+                else {
+                    val m = meterArea ?: 0.0
+                    val p = pricePerMeter ?: 0L
+                    (m * p).toLong()
+                }
+            }
         }
+
+    val displayPrice: Long
+        get() = if (totalPrice > 0) totalPrice else computedTotal
+
+    /** شرایط فروش متنی */
+    val saleConditionsSummary: String
+        get() = buildList {
+            if (saleConditionCash) add("نقدی")
+            if (saleConditionInstallment) add("شرایطی")
+            if (saleConditionExchange) add("تهاتر")
+        }.joinToString("، ").ifBlank { "تعیین‌نشده" }
 }

@@ -8,8 +8,6 @@ import androidx.compose.material.icons.filled.Apartment
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.EventNote
-import androidx.compose.material.icons.filled.Payments
-import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -33,12 +31,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import ir.pishfile.app.ui.screens.customers.CustomerDetailScreen
-import ir.pishfile.app.ui.screens.customers.CustomerEditScreen
-import ir.pishfile.app.ui.screens.customers.CustomerListScreen
 import ir.pishfile.app.ui.screens.dashboard.DashboardScreen
 import ir.pishfile.app.ui.screens.followups.FollowUpsScreen
-import ir.pishfile.app.ui.screens.installments.InstallmentsScreen
 import ir.pishfile.app.ui.screens.prefiles.PreFileDetailScreen
 import ir.pishfile.app.ui.screens.prefiles.PreFileEditScreen
 import ir.pishfile.app.ui.screens.prefiles.PreFileListScreen
@@ -50,30 +44,24 @@ import ir.pishfile.app.ui.screens.units.UnitDetailScreen
 import ir.pishfile.app.ui.screens.units.UnitEditScreen
 import ir.pishfile.app.ui.screens.units.UnitListScreen
 
-/** آدرس صفحه‌ها — یک‌جا و بدون رشته‌ی پراکنده در کد */
+/** مسیرهای برنامه */
 object Routes {
     const val DASHBOARD = "dashboard"
-    const val PROJECTS = "projects"
-    const val PROJECT_NEW = "projects/new"
-    const val PROJECT_DETAIL = "project/{projectId}"
-    const val PROJECT_EDIT = "project/{projectId}/edit"
+    const val PREFILES = "prefiles"
+    const val PREFILE_NEW = "prefiles/new?projectId={projectId}&unitId={unitId}"
+    const val PREFILE_DETAIL = "prefile/{preFileId}"
+    const val PREFILE_EDIT = "prefile/{preFileId}/edit"
 
     const val UNITS = "units"
     const val UNIT_NEW = "units/new?projectId={projectId}"
     const val UNIT_DETAIL = "unit/{unitId}"
     const val UNIT_EDIT = "unit/{unitId}/edit"
 
-    const val CUSTOMERS = "customers"
-    const val CUSTOMER_NEW = "customers/new"
-    const val CUSTOMER_DETAIL = "customer/{customerId}"
-    const val CUSTOMER_EDIT = "customer/{customerId}/edit"
+    const val PROJECTS = "projects"
+    const val PROJECT_NEW = "projects/new"
+    const val PROJECT_DETAIL = "project/{projectId}"
+    const val PROJECT_EDIT = "project/{projectId}/edit"
 
-    const val PREFILES = "prefiles"
-    const val PREFILE_NEW = "prefiles/new?projectId={projectId}&unitId={unitId}&customerId={customerId}"
-    const val PREFILE_DETAIL = "prefile/{preFileId}"
-    const val PREFILE_EDIT = "prefile/{preFileId}/edit"
-
-    const val INSTALLMENTS = "installments"
     const val FOLLOWUPS = "followups"
     const val SETTINGS = "settings"
 
@@ -82,12 +70,10 @@ object Routes {
     fun unit(id: String) = "unit/$id"
     fun unitEdit(id: String) = "unit/$id/edit"
     fun unitNew(projectId: String? = null) = "units/new?projectId=${projectId ?: ""}"
-    fun customer(id: String) = "customer/$id"
-    fun customerEdit(id: String) = "customer/$id/edit"
     fun preFile(id: String) = "prefile/$id"
     fun preFileEdit(id: String) = "prefile/$id/edit"
-    fun preFileNew(projectId: String? = null, unitId: String? = null, customerId: String? = null) =
-        "prefiles/new?projectId=${projectId ?: ""}&unitId=${unitId ?: ""}&customerId=${customerId ?: ""}"
+    fun preFileNew(projectId: String? = null, unitId: String? = null) =
+        "prefiles/new?projectId=${projectId ?: ""}&unitId=${unitId ?: ""}"
 }
 
 private data class TopLevelDestination(
@@ -96,12 +82,12 @@ private data class TopLevelDestination(
     val icon: ImageVector,
 )
 
+/** تب‌های پایینی: پیش‌فروش، واحدها، پروژه‌ها، داشبورد */
 private val topLevelDestinations = listOf(
     TopLevelDestination(Routes.DASHBOARD, "داشبورد", Icons.Filled.Dashboard),
-    TopLevelDestination(Routes.PREFILES, "پیش‌فایل‌ها", Icons.Filled.Description),
+    TopLevelDestination(Routes.PREFILES, "پیش‌فروش", Icons.Filled.Description),
     TopLevelDestination(Routes.UNITS, "واحدها", Icons.Filled.Apartment),
-    TopLevelDestination(Routes.CUSTOMERS, "مشتری‌ها", Icons.Filled.People),
-    TopLevelDestination(Routes.PROJECTS, "پروژه‌ها", Icons.Filled.Dashboard),
+    TopLevelDestination(Routes.PROJECTS, "پروژه‌ها", Icons.Filled.Apartment),
 )
 
 private fun titleFor(route: String?): String = when {
@@ -111,11 +97,8 @@ private fun titleFor(route: String?): String = when {
     route.startsWith("project/") -> "پروژه"
     route.startsWith("unit/") -> "واحد"
     route.startsWith(Routes.UNITS) -> "واحدها"
-    route.startsWith(Routes.CUSTOMERS) -> "مشتری‌ها"
-    route.startsWith("customer/") -> "مشتری"
-    route.startsWith(Routes.PREFILES) -> "پیش‌فایل‌ها"
-    route.startsWith("prefile/") -> "پیش‌فایل"
-    route.startsWith(Routes.INSTALLMENTS) -> "اقساط و سررسیدها"
+    route.startsWith(Routes.PREFILES) -> "پیش‌فروش"
+    route.startsWith("prefile/") -> "فایل پیش‌فروش"
     route.startsWith(Routes.FOLLOWUPS) -> "پیگیری‌ها"
     route.startsWith(Routes.SETTINGS) -> "تنظیمات"
     else -> "پیش‌فایل"
@@ -141,9 +124,6 @@ fun MainScreen() {
                     }
                 },
                 actions = {
-                    IconButton(onClick = { navController.navigate(Routes.INSTALLMENTS) }) {
-                        Icon(Icons.Filled.Payments, contentDescription = "اقساط")
-                    }
                     IconButton(onClick = { navController.navigate(Routes.FOLLOWUPS) }) {
                         Icon(Icons.Filled.EventNote, contentDescription = "پیگیری‌ها")
                     }
@@ -182,13 +162,10 @@ fun MainScreen() {
         floatingActionButton = {
             val fab: (@Composable () -> Unit)? = when (currentRoute) {
                 Routes.PREFILES -> {
-                    { AddFab("پیش‌فایل جدید") { navController.navigate(Routes.preFileNew()) } }
+                    { AddFab("پیش‌فروش جدید") { navController.navigate(Routes.preFileNew()) } }
                 }
                 Routes.UNITS -> {
                     { AddFab("واحد جدید") { navController.navigate(Routes.unitNew()) } }
-                }
-                Routes.CUSTOMERS -> {
-                    { AddFab("مشتری جدید") { navController.navigate(Routes.CUSTOMER_NEW) } }
                 }
                 Routes.PROJECTS -> {
                     { AddFab("پروژه جدید") { navController.navigate(Routes.PROJECT_NEW) } }
@@ -252,12 +229,7 @@ fun MainScreen() {
             }
 
             // ---------- واحدها ----------
-            composable(
-                Routes.UNITS,
-                arguments = listOf(navArgument("projectId") {
-                    type = NavType.StringType; defaultValue = ""
-                }),
-            ) {
+            composable(Routes.UNITS) {
                 UnitListScreen(
                     onOpen = { id -> navController.navigate(Routes.unit(id)) },
                 )
@@ -300,42 +272,7 @@ fun MainScreen() {
                 )
             }
 
-            // ---------- مشتری‌ها ----------
-            composable(Routes.CUSTOMERS) {
-                CustomerListScreen(onOpen = { id -> navController.navigate(Routes.customer(id)) })
-            }
-            composable(Routes.CUSTOMER_NEW) {
-                CustomerEditScreen(
-                    customerId = null,
-                    onBack = { navController.popBackStack() },
-                    onSaved = { id -> navController.navigate(Routes.customer(id)) },
-                )
-            }
-            composable(
-                Routes.CUSTOMER_DETAIL,
-                arguments = listOf(navArgument("customerId") { type = NavType.StringType }),
-            ) { entry ->
-                val customerId = entry.arguments?.getString("customerId").orEmpty()
-                CustomerDetailScreen(
-                    customerId = customerId,
-                    onBack = { navController.popBackStack() },
-                    onEdit = { navController.navigate(Routes.customerEdit(customerId)) },
-                    onNewPreFile = { navController.navigate(Routes.preFileNew(customerId = customerId)) },
-                    onOpenPreFile = { id -> navController.navigate(Routes.preFile(id)) },
-                )
-            }
-            composable(
-                Routes.CUSTOMER_EDIT,
-                arguments = listOf(navArgument("customerId") { type = NavType.StringType }),
-            ) { entry ->
-                CustomerEditScreen(
-                    customerId = entry.arguments?.getString("customerId"),
-                    onBack = { navController.popBackStack() },
-                    onSaved = { navController.popBackStack() },
-                )
-            }
-
-            // ---------- پیش‌فایل‌ها ----------
+            // ---------- فایل‌های پیش‌فروش ----------
             composable(Routes.PREFILES) {
                 PreFileListScreen(onOpen = { id -> navController.navigate(Routes.preFile(id)) })
             }
@@ -344,14 +281,12 @@ fun MainScreen() {
                 arguments = listOf(
                     navArgument("projectId") { type = NavType.StringType; defaultValue = "" },
                     navArgument("unitId") { type = NavType.StringType; defaultValue = "" },
-                    navArgument("customerId") { type = NavType.StringType; defaultValue = "" },
                 ),
             ) { entry ->
                 PreFileEditScreen(
                     preFileId = null,
                     initialProjectId = entry.arguments?.getString("projectId").orEmpty(),
                     initialUnitId = entry.arguments?.getString("unitId").orEmpty(),
-                    initialCustomerId = entry.arguments?.getString("customerId").orEmpty(),
                     onBack = { navController.popBackStack() },
                     onSaved = { id -> navController.navigate(Routes.preFile(id)) },
                 )
@@ -366,7 +301,6 @@ fun MainScreen() {
                     onBack = { navController.popBackStack() },
                     onEdit = { navController.navigate(Routes.preFileEdit(preFileId)) },
                     onOpenUnit = { id -> navController.navigate(Routes.unit(id)) },
-                    onOpenCustomer = { id -> navController.navigate(Routes.customer(id)) },
                 )
             }
             composable(
@@ -377,23 +311,19 @@ fun MainScreen() {
                     preFileId = entry.arguments?.getString("preFileId"),
                     initialProjectId = "",
                     initialUnitId = "",
-                    initialCustomerId = "",
                     onBack = { navController.popBackStack() },
                     onSaved = { navController.popBackStack() },
                 )
             }
 
-            // ---------- سایر ----------
-            composable(Routes.INSTALLMENTS) {
-                InstallmentsScreen(onOpenPreFile = { id -> navController.navigate(Routes.preFile(id)) })
-            }
+            // ---------- پیگیری‌ها و تنظیمات ----------
             composable(
                 "followups?new={new}",
                 arguments = listOf(navArgument("new") { type = NavType.StringType; defaultValue = "" }),
             ) { entry ->
                 FollowUpsScreen(
                     openNewOnStart = entry.arguments?.getString("new") == "1",
-                    onOpenCustomer = { id -> navController.navigate(Routes.customer(id)) },
+                    onOpenPreFile = { id -> navController.navigate(Routes.preFile(id)) },
                 )
             }
             composable(Routes.SETTINGS) {
@@ -413,7 +343,3 @@ private fun AddFab(label: String, onClick: () -> Unit) {
         Icon(Icons.Filled.Add, contentDescription = label)
     }
 }
-
-/** برای دسترسی صفحه‌ها به NavController در صورت نیاز */
-@Composable
-fun rememberAppNavController(): NavHostController = rememberNavController()

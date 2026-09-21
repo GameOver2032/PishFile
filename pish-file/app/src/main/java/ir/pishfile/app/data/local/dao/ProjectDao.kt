@@ -72,6 +72,9 @@ interface ProjectDao {
     @Query("UPDATE projects SET deletedAt = :timestamp, syncState = 'PENDING_DELETE', updatedAt = :timestamp WHERE id = :id")
     suspend fun softDelete(id: String, timestamp: Long = System.currentTimeMillis())
 
+    @Query("UPDATE projects SET isFavorite = :favorite, updatedAt = :timestamp, syncState = 'PENDING_UPLOAD' WHERE id = :id")
+    suspend fun setFavorite(id: String, favorite: Boolean, timestamp: Long = System.currentTimeMillis())
+    
     @Query("DELETE FROM projects WHERE remoteId IS NOT NULL AND deletedAt IS NOT NULL")
     suspend fun purgeSyncedDeleted()
 }

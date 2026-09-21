@@ -8,17 +8,11 @@ import androidx.room.PrimaryKey
 import java.util.UUID
 
 /**
- * پیگیری — تماس، بازدید، جلسه یا یادآوری مربوط به مشتری/پیش‌فایل.
+ * یادداشت یا رویداد پیگیری (تماس، جلسه، یادآوری).
  */
 @Entity(
     tableName = "follow_ups",
     foreignKeys = [
-        ForeignKey(
-            entity = CustomerEntity::class,
-            parentColumns = ["id"],
-            childColumns = ["customerId"],
-            onDelete = ForeignKey.CASCADE
-        ),
         ForeignKey(
             entity = PreFileEntity::class,
             parentColumns = ["id"],
@@ -27,75 +21,66 @@ import java.util.UUID
         )
     ],
     indices = [
-        Index("customerId"), Index("preFileId"), Index("dueDate"),
-        Index("status"), Index("remoteId"), Index("syncState")
+        Index("preFileId"), Index("dueDate"), Index("status"), Index("syncState")
     ]
 )
 data class FollowUpEntity(
     @PrimaryKey
     val id: String = UUID.randomUUID().toString(),
 
-    /** نوع: CALL تماس، VISIT بازدید، MEETING جلسه، MESSAGE پیام، REMINDER یادآوری */
+    /** نوع: CALL / VISIT / MEETING / OTHER */
     val type: String = "CALL",
 
-    /** اولویت: LOW / NORMAL / HIGH / URGENT */
+    /** اولویت: LOW / NORMAL / HIGH */
     val priority: String = "NORMAL",
 
-    /** عنوان کوتاه */
+    /** عنوان/موضوع */
     val title: String,
 
     /** شرح */
     val description: String? = null,
 
-    /** نتیجه‌ی پیگیری برای موارد انجام‌شده */
-    @ColumnInfo(name = "outcome")
+    /** نتیجه پیگیری */
     val outcome: String? = null,
 
-    /** نتیجه مثبت/منفی/بی‌نتیجه */
-    @ColumnInfo(name = "result")
     val result: String? = null,
 
-    @ColumnInfo(name = "customerId")
-    val customerId: String? = null,
-
+    /** شناسه فایل پیش‌فروش مربوطه */
     @ColumnInfo(name = "preFileId")
     val preFileId: String? = null,
 
+    /** شناسه پروژه */
     @ColumnInfo(name = "projectId")
     val projectId: String? = null,
 
-    /** تاریخ انجام (شمسی) */
+    /** تاریخ سررسید (شمسی) */
     @ColumnInfo(name = "dueDate")
     val dueDate: String? = null,
 
-    /** ساعت */
+    /** ساعت سررسید */
     @ColumnInfo(name = "dueTime")
     val dueTime: String? = null,
 
-    /** مدت زمان صرف‌شده (دقیقه) */
     @ColumnInfo(name = "durationMinutes")
     val durationMinutes: Int? = null,
 
     /** PENDING / DONE / CANCELED */
     val status: String = "PENDING",
 
-    /** تاریخ انجام واقعی */
     @ColumnInfo(name = "completedDate")
     val completedDate: String? = null,
 
     /** مسئول پیگیری */
-    @ColumnInfo(name = "assignee")
     val assignee: String? = null,
 
-    /** شماره تماس هر دو طرف برای گزارش */
+    /** شماره تماس */
     @ColumnInfo(name = "contactPhone")
     val contactPhone: String? = null,
 
-    /** یادآوری چند روز قبل */
     @ColumnInfo(name = "remindDaysBefore")
     val remindDaysBefore: Int = 0,
 
-    // --- میدان‌های آماده برای همگام‌سازی ---
+    // --- فیلدهای همگام‌سازی ---
     @ColumnInfo(name = "remoteId")
     val remoteId: String? = null,
 

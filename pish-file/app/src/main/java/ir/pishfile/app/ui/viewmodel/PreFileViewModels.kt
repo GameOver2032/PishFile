@@ -8,16 +8,12 @@ import androidx.lifecycle.viewModelScope
 import ir.pishfile.app.core.Constants
 import ir.pishfile.app.core.Formatters
 import ir.pishfile.app.data.local.dao.PreFileRow
-import ir.pishfile.app.data.local.entity.CustomerEntity
-import ir.pishfile.app.data.local.entity.InstallmentEntity
 import ir.pishfile.app.data.local.entity.PreFileEntity
 import ir.pishfile.app.data.local.entity.ProjectEntity
 import ir.pishfile.app.data.local.entity.UnitEntity
-import ir.pishfile.app.data.repository.CustomerRepository
 import ir.pishfile.app.data.repository.FollowUpRepository
 import ir.pishfile.app.data.repository.PreFileRepository
 import ir.pishfile.app.data.repository.ProjectRepository
-import ir.pishfile.app.data.repository.SettingsRepository
 import ir.pishfile.app.data.repository.UnitRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
@@ -26,7 +22,6 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
@@ -34,116 +29,113 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /**
- * فرم پیش‌فایل — پرجزئیات‌ترین فرم برنامه.
- * همه‌ی شرایط مالی و تعهدات در همین ساختار جمع شده است.
+ * فرم ثبت / ویرایش فایل پیش‌فروش:
+ *  - مدل قیمت‌گذاری: متری، واریزی-امتیاز، سهامی
+ *  - شرایط فروش: نقد، شرایطی، تهاتر + توضیحات شرایط فروش
+ *  - رتبه‌بندی با کلید روشن/خاموش
+ *  - اطلاعات اقساط: تعداد، مانده، مبلغ قسط، دوره، تاریخ سررسید قسط پیش‌رو
+ *  - وضعیت: پیش‌نویس، فروش فوری، غیر فوری، منصرف از فروش
  */
 data class PreFileForm(
     val draftNumber: String = "",
     val draftDate: String = Formatters.todayJalali(),
     val projectId: String = "",
     val unitId: String = "",
-    val customerId: String = "",
-    val salesAgentName: String = "",
-    val salesAgentPhone: String = "",
-    val trackingCode: String = "",
-    val totalPrice: String = "",
+    val ownerName: String = "",
+    val ownerPhone: String = "",
+
+    // مدل قیمت‌گذاری
+    val pricingModel: String = Constants.PRICING_METER,
+
+    // ۱) واریزی و امتیاز
+    val depositAmount: String = "",
+    val bonusAmount: String = "",
+
+    // ۲) متری
     val pricePerMeter: String = "",
-    val discount: String = "",
-    val finalPrice: String = "",
-    val prepayment: String = "",
+    val meterArea: String = "",
+    val totalPrice: String = "",
+
+    // ۳) سهامی
+    val shareMeterArea: String = "",
+    val shareCount: String = "",
+    val sharePrice: String = "",
+
+    // رتبه بندی
+    val hasRanking: Boolean = false,
+    val ranking: String = "",
+
+    // شرایط فروش
+    val saleConditionCash: Boolean = true,
+    val saleConditionInstallment: Boolean = false,
+    val saleConditionExchange: Boolean = false,
+    val saleConditionNotes: String = "",
+
+    // اقساط
     val installmentCount: String = "",
+    val remainingInstallmentsCount: String = "",
     val installmentAmount: String = "",
     val installmentPeriod: String = "ماهانه",
-    val installmentStartDate: String = "",
-    val paymentType: String = "اقساطی",
-    val sellerCommitment: String = "",
-    val buyerCommitment: String = "",
-    val penaltyClause: String = "",
-    val cancellationTerms: String = "",
-    val deedDate: String = "",
-    val deedOffice: String = "",
+    val nextInstallmentDueDate: String = "",
+
+    // وضعیت و تحویل
+    val status: String = Constants.PREFILE_NORMAL,
     val deliveryDate: String = "",
-    val isUnitMortgaged: Boolean = false,
-    val guaranteeType: String = "",
-    val chequeCount: String = "",
-    val chequeAmount: String = "",
-    val exchangeDetails: String = "",
-    val status: String = Constants.PREFILE_DRAFT,
     val notes: String = "",
 ) {
-    val totalPriceValue: Long get() = Formatters.parseLong(totalPrice) ?: 0L
-    val discountValue: Long get() = Formatters.parseLong(discount) ?: 0L
-    val prepaymentValue: Long get() = Formatters.parseLong(prepayment) ?: 0L
+    val depositValue: Long get() = Formatters.parseLong(depositAmount) ?: 0L
+    val bonusValue: Long get() = Formatters.parseLong(bonusAmount) ?: 0L
+    val pricePerMeterValue: Long get() = Formatters.parseLong(pricePerMeter) ?: 0L
+    val meterAreaValue: Double get() = Formatters.toLatinDigits(meterArea).toDoubleOrNull() ?: 0.0
+    val totalDirectPrice: Long get() = Formatters.parseLong(totalPrice) ?: 0L
+    val sharePriceValue: Long get() = Formatters.parseLong(sharePrice) ?: 0L
+    val shareCountValue: Int get() = Formatters.parseLong(shareCount)?.toInt() ?: 1
 
-    val finalPriceValue: Long
-        get() = Formatters.parseLong(finalPrice) ?: (totalPriceValue - discountValue)
-
-    /** مبلغ قابل قسط‌بندی */
-    val remainingValue: Long get() = (finalPriceValue - prepaymentValue).coerceAtLeast(0L)
-
-    /** مبلغ هر قسط پیشنهادی */
-    fun suggestedInstallment(): Long {
-        val count = Formatters.parseLong(installmentCount)?.toInt() ?: 0
-        return if (count > 0) remainingValue / count else 0L
-    }
-
-    /** مبلغ کل قرارداد بر اساس متراژ واحد و قیمت هر متر */
-    fun computedFromUnit(unit: UnitEntity): Long? {
-        val area = unit.grossArea
-        val perMeter = Formatters.parseLong(pricePerMeter) ?: unit.pricePerMeter
-        return if (area != null && perMeter != null) (area * perMeter).toLong() else unit.finalPrice ?: unit.totalPrice
-    }
-
-    fun installmentPeriodMonths(): Int = when (installmentPeriod) {
-        "دو ماهه" -> 2
-        "فصلی" -> 3
-        "شش‌ماهه" -> 6
-        "سالانه" -> 12
-        else -> 1
-    }
+    /** مبلغ کل محاسبه‌شده */
+    val computedTotal: Long
+        get() = when (pricingModel) {
+            Constants.PRICING_DEPOSIT_BONUS -> depositValue + bonusValue
+            Constants.PRICING_SHARE -> sharePriceValue * shareCountValue
+            else -> {
+                if (totalDirectPrice > 0) totalDirectPrice
+                else (meterAreaValue * pricePerMeterValue).toLong()
+            }
+        }
 
     fun toEntity(existing: PreFileEntity? = null, unit: UnitEntity? = null): PreFileEntity {
-        val final = finalPriceValue
         return PreFileEntity(
             id = existing?.id ?: java.util.UUID.randomUUID().toString(),
             draftNumber = draftNumber.ifBlank { "PF-${Formatters.todayJalali().substringBefore('/')}-0001" },
             draftDate = draftDate.ifBlank { Formatters.todayJalali() },
             projectId = projectId,
             unitId = unitId.ifBlank { null },
-            customerId = customerId.ifBlank { null },
-            salesAgentName = salesAgentName.ifBlank { null },
-            salesAgentPhone = salesAgentPhone.ifBlank { null },
-            trackingCode = trackingCode.ifBlank { null },
+            ownerName = ownerName.ifBlank { null },
+            ownerPhone = ownerPhone.ifBlank { null },
+            pricingModel = pricingModel,
+            depositAmount = Formatters.parseLong(depositAmount),
+            bonusAmount = Formatters.parseLong(bonusAmount),
+            pricePerMeter = Formatters.parseLong(pricePerMeter),
+            meterArea = meterAreaValue.takeIf { it > 0 },
+            totalPrice = computedTotal,
+            shareMeterArea = Formatters.toLatinDigits(shareMeterArea).toDoubleOrNull(),
+            shareCount = Formatters.parseLong(shareCount)?.toInt(),
+            sharePrice = Formatters.parseLong(sharePrice),
+            hasRanking = hasRanking,
+            ranking = if (hasRanking) ranking.ifBlank { null } else null,
+            saleConditionCash = saleConditionCash,
+            saleConditionInstallment = saleConditionInstallment,
+            saleConditionExchange = saleConditionExchange,
+            saleConditionNotes = saleConditionNotes.ifBlank { null },
+            installmentCount = Formatters.parseLong(installmentCount)?.toInt(),
+            remainingInstallmentsCount = Formatters.parseLong(remainingInstallmentsCount)?.toInt(),
+            installmentAmount = Formatters.parseLong(installmentAmount),
+            installmentPeriod = installmentPeriod,
+            nextInstallmentDueDate = nextInstallmentDueDate.ifBlank { null },
             unitBlock = unit?.block,
             unitNumber = unit?.unitNumber,
             unitFloor = unit?.floor,
-            unitArea = unit?.grossArea,
-            totalPrice = totalPriceValue,
-            pricePerMeter = Formatters.parseLong(pricePerMeter) ?: unit?.pricePerMeter,
-            discount = discountValue.takeIf { it > 0 },
-            finalPrice = final,
-            prepayment = prepaymentValue.takeIf { it > 0 },
-            paidAmount = existing?.paidAmount ?: 0L,
-            remainingAmount = final - (existing?.paidAmount ?: 0L),
-            installmentCount = Formatters.parseLong(installmentCount)?.toInt(),
-            installmentAmount = Formatters.parseLong(installmentAmount) ?: suggestedInstallment().takeIf { it > 0 },
-            installmentPeriod = installmentPeriod,
-            installmentStartDate = installmentStartDate.ifBlank { null },
-            paymentType = paymentTypeLabelToCode(paymentType),
-            sellerCommitment = sellerCommitment.ifBlank { null },
-            buyerCommitment = buyerCommitment.ifBlank { null },
-            penaltyClause = penaltyClause.ifBlank { null },
-            cancellationTerms = cancellationTerms.ifBlank { null },
-            deedDate = deedDate.ifBlank { null },
-            deedOffice = deedOffice.ifBlank { null },
-            deliveryDate = deliveryDate.ifBlank { null },
-            isUnitMortgaged = isUnitMortgaged,
-            guaranteeType = guaranteeType.ifBlank { null },
-            chequeCount = Formatters.parseLong(chequeCount)?.toInt(),
-            chequeAmount = Formatters.parseLong(chequeAmount),
-            exchangeDetails = exchangeDetails.ifBlank { null },
             status = status,
-            confirmedDate = existing?.confirmedDate ?: if (status == Constants.PREFILE_CONFIRMED) Formatters.todayJalali() else null,
+            deliveryDate = deliveryDate.ifBlank { null },
             notes = notes.ifBlank { null },
             isFavorite = existing?.isFavorite ?: false,
             createdAt = existing?.createdAt ?: System.currentTimeMillis(),
@@ -152,45 +144,35 @@ data class PreFileForm(
     }
 
     companion object {
-        fun paymentTypeLabelToCode(label: String): String =
-            Constants.paymentTypes.firstOrNull { Constants.paymentTypeLabel(it) == label } ?: Constants.PAYMENT_INSTALLMENT
-
-        fun paymentTypeOptions(): List<String> = Constants.paymentTypes.map { Constants.paymentTypeLabel(it) }
-
-        val installmentPeriods = listOf("ماهانه", "دو ماهه", "فصلی", "شش‌ماهه", "سالانه")
-
         fun from(entity: PreFileEntity) = PreFileForm(
             draftNumber = entity.draftNumber,
             draftDate = entity.draftDate,
             projectId = entity.projectId,
             unitId = entity.unitId.orEmpty(),
-            customerId = entity.customerId.orEmpty(),
-            salesAgentName = entity.salesAgentName.orEmpty(),
-            salesAgentPhone = entity.salesAgentPhone.orEmpty(),
-            trackingCode = entity.trackingCode.orEmpty(),
-            totalPrice = entity.totalPrice.toString(),
+            ownerName = entity.ownerName.orEmpty(),
+            ownerPhone = entity.ownerPhone.orEmpty(),
+            pricingModel = entity.pricingModel,
+            depositAmount = entity.depositAmount?.toString().orEmpty(),
+            bonusAmount = entity.bonusAmount?.toString().orEmpty(),
             pricePerMeter = entity.pricePerMeter?.toString().orEmpty(),
-            discount = entity.discount?.toString().orEmpty(),
-            finalPrice = entity.finalPrice?.toString().orEmpty(),
-            prepayment = entity.prepayment?.toString().orEmpty(),
+            meterArea = entity.meterArea?.toString().orEmpty(),
+            totalPrice = entity.totalPrice.toString(),
+            shareMeterArea = entity.shareMeterArea?.toString().orEmpty(),
+            shareCount = entity.shareCount?.toString().orEmpty(),
+            sharePrice = entity.sharePrice?.toString().orEmpty(),
+            hasRanking = entity.hasRanking,
+            ranking = entity.ranking.orEmpty(),
+            saleConditionCash = entity.saleConditionCash,
+            saleConditionInstallment = entity.saleConditionInstallment,
+            saleConditionExchange = entity.saleConditionExchange,
+            saleConditionNotes = entity.saleConditionNotes.orEmpty(),
             installmentCount = entity.installmentCount?.toString().orEmpty(),
+            remainingInstallmentsCount = entity.remainingInstallmentsCount?.toString().orEmpty(),
             installmentAmount = entity.installmentAmount?.toString().orEmpty(),
             installmentPeriod = entity.installmentPeriod ?: "ماهانه",
-            installmentStartDate = entity.installmentStartDate.orEmpty(),
-            paymentType = Constants.paymentTypeLabel(entity.paymentType),
-            sellerCommitment = entity.sellerCommitment.orEmpty(),
-            buyerCommitment = entity.buyerCommitment.orEmpty(),
-            penaltyClause = entity.penaltyClause.orEmpty(),
-            cancellationTerms = entity.cancellationTerms.orEmpty(),
-            deedDate = entity.deedDate.orEmpty(),
-            deedOffice = entity.deedOffice.orEmpty(),
-            deliveryDate = entity.deliveryDate.orEmpty(),
-            isUnitMortgaged = entity.isUnitMortgaged,
-            guaranteeType = entity.guaranteeType.orEmpty(),
-            chequeCount = entity.chequeCount?.toString().orEmpty(),
-            chequeAmount = entity.chequeAmount?.toString().orEmpty(),
-            exchangeDetails = entity.exchangeDetails.orEmpty(),
+            nextInstallmentDueDate = entity.nextInstallmentDueDate.orEmpty(),
             status = entity.status,
+            deliveryDate = entity.deliveryDate.orEmpty(),
             notes = entity.notes.orEmpty(),
         )
     }
@@ -212,9 +194,6 @@ class PreFileListViewModel(private val repository: PreFileRepository) : ViewMode
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    val statusCounts = repository.observeStatusCounts()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
-
     val totalCount = repository.observeCount()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
 
@@ -222,18 +201,12 @@ class PreFileListViewModel(private val repository: PreFileRepository) : ViewMode
     fun setStatusFilter(status: String?) { statusFilter.value = status }
 
     fun delete(id: String) { viewModelScope.launch { repository.delete(id) } }
-
-    fun changeStatus(preFile: PreFileEntity, status: String) {
-        viewModelScope.launch { repository.save(preFile.copy(status = status)) }
-    }
 }
 
 class PreFileEditViewModel(
     private val repository: PreFileRepository,
     private val projectRepository: ProjectRepository,
     private val unitRepository: UnitRepository,
-    private val customerRepository: CustomerRepository,
-    private val settingsRepository: SettingsRepository,
 ) : ViewModel() {
 
     var form by mutableStateOf(PreFileForm())
@@ -241,12 +214,7 @@ class PreFileEditViewModel(
 
     var projects by mutableStateOf<List<ProjectEntity>>(emptyList())
         private set
-    var customers by mutableStateOf<List<CustomerEntity>>(emptyList())
-        private set
     var availableUnits by mutableStateOf<List<UnitEntity>>(emptyList())
-        private set
-
-    var autoGenerateInstallments by mutableStateOf(true)
         private set
 
     private var existing: PreFileEntity? = null
@@ -255,15 +223,10 @@ class PreFileEditViewModel(
     var isLoaded by mutableStateOf(false)
         private set
 
-    var isSaved by mutableStateOf(false)
-        private set
-
-    private var draftsThisSession = 0
-
     fun load(id: String) {
         if (isLoaded || id.isBlank()) return
         viewModelScope.launch {
-            prepareLookups()
+            projects = projectRepository.getAll()
             repository.getById(id)?.let { entity ->
                 existing = entity
                 selectedUnit = entity.unitId?.let { unitRepository.getById(it) }
@@ -272,71 +235,42 @@ class PreFileEditViewModel(
                     availableUnits = unitRepository.getByProject(form.projectId)
                 }
             }
-            autoGenerateInstallments = settingsRepository.autoGenerateInstallments.first()
             isLoaded = true
         }
     }
 
-    fun startNew(projectId: String?, unitId: String?, customerId: String?) {
+    fun startNew(projectId: String?, unitId: String?) {
         if (isLoaded) return
         viewModelScope.launch {
-            prepareLookups()
-            val settings = settingsRepository
+            projects = projectRepository.getAll()
             val defaultProject = projectId?.takeIf { it.isNotBlank() }
                 ?: projects.firstOrNull()?.id.orEmpty()
-            val agent = settings.agentName.first()
-            val agentPhone = settings.agentPhone.first()
-            val count = settings.defaultInstallmentCount.first()
 
             availableUnits = unitRepository.getByProject(defaultProject)
             selectedUnit = unitId?.takeIf { it.isNotBlank() }?.let { unitRepository.getById(it) }
                 ?: availableUnits.firstOrNull { it.status == Constants.UNIT_AVAILABLE }
 
-            autoGenerateInstallments = settings.autoGenerateInstallments.first()
-
             form = PreFileForm(
                 draftNumber = repository.nextDraftNumber(),
                 projectId = defaultProject,
                 unitId = selectedUnit?.id.orEmpty(),
-                customerId = customerId?.takeIf { it.isNotBlank() }.orEmpty(),
-                salesAgentName = agent,
-                salesAgentPhone = agentPhone,
-                installmentPeriod = "ماهانه",
-                installmentCount = count,
-                installmentStartDate = Formatters.addJalaliMonths(Formatters.todayJalali(), 1),
-                prepayment = selectedUnit?.prepaymentSuggestion?.toString().orEmpty(),
-            ).let { initial ->
-                selectedUnit?.let { unit -> applyUnitToForm(initial, unit) } ?: initial
+                status = Constants.PREFILE_NORMAL,
+            )
+
+            // اگر پروژه انتخاب شده باشد، ویژگی‌های پروژه را روی فرم بنشان
+            val prj = projects.firstOrNull { it.id == defaultProject }
+            if (prj != null) {
+                applyProjectToForm(prj)
             }
+            if (selectedUnit != null) {
+                applyUnitToForm(selectedUnit!!)
+            }
+
             isLoaded = true
         }
     }
 
-    private suspend fun prepareLookups() {
-        projects = projectRepository.getAll()
-        customers = customerRepository.getAll()
-    }
-
-    /** با انتخاب واحد، مشخصات و قیمت‌ها خودکار پر می‌شوند (سرعت کار فروش) */
-    private suspend fun applyUnitToForm(base: PreFileForm, unit: UnitEntity): PreFileForm {
-        val pricePerMeter = unit.pricePerMeter ?: unit.totalPrice?.let { total ->
-            unit.grossArea?.takeIf { it > 0 }?.let { (total / it).toLong() }
-        }
-        val totalPrice = unit.finalPrice ?: unit.totalPrice
-            ?: (unit.grossArea?.let { area -> pricePerMeter?.let { (area * it).toLong() } })
-
-        return base.copy(
-            unitId = unit.id,
-            pricePerMeter = pricePerMeter?.toString().orEmpty(),
-            totalPrice = totalPrice?.toString().orEmpty(),
-            finalPrice = totalPrice?.toString().orEmpty(),
-            prepayment = base.prepayment.ifBlank { unit.prepaymentSuggestion?.toString().orEmpty() },
-            installmentCount = base.installmentCount.ifBlank { unit.suggestedInstallmentCount?.toString().orEmpty() },
-            installmentAmount = unit.suggestedInstallment?.toString().orEmpty(),
-            deliveryDate = base.deliveryDate.ifBlank { unit.deliveryDate.orEmpty() },
-        )
-    }
-
+    /** با انتخاب پروژه، مدل قیمت‌گذاری و شرایط مخصوص پروژه خودکار پر می‌شود */
     fun selectProject(projectId: String) {
         viewModelScope.launch {
             availableUnits = unitRepository.getByProject(projectId)
@@ -344,19 +278,44 @@ class PreFileEditViewModel(
             form = form.copy(
                 projectId = projectId,
                 unitId = "",
-                pricePerMeter = project?.salePricePerMeter?.toString() ?: form.pricePerMeter,
-                deliveryDate = form.deliveryDate.ifBlank { project?.deliveryDate.orEmpty() },
             )
             selectedUnit = null
+            if (project != null) {
+                applyProjectToForm(project)
+            }
         }
+    }
+
+    private fun applyProjectToForm(project: ProjectEntity) {
+        val model = project.pricingModel.ifBlank { Constants.PRICING_METER }
+        form = form.copy(
+            pricingModel = model,
+            pricePerMeter = project.salePricePerMeter?.toString() ?: form.pricePerMeter,
+            depositAmount = project.defaultDepositAmount?.toString() ?: form.depositAmount,
+            shareMeterArea = project.shareMeterArea?.toString() ?: form.shareMeterArea,
+            sharePrice = project.sharePrice?.toString() ?: form.sharePrice,
+            deliveryDate = form.deliveryDate.ifBlank { project.deliveryDate.orEmpty() },
+        )
     }
 
     fun selectUnit(unitId: String) {
         viewModelScope.launch {
             val unit = availableUnits.firstOrNull { it.id == unitId }
             selectedUnit = unit
-            if (unit != null) form = applyUnitToForm(form, unit) else form = form.copy(unitId = "")
+            if (unit != null) applyUnitToForm(unit) else form = form.copy(unitId = "")
         }
+    }
+
+    private fun applyUnitToForm(unit: UnitEntity) {
+        form = form.copy(
+            unitId = unit.id,
+            meterArea = unit.grossArea?.toString() ?: form.meterArea,
+            pricePerMeter = unit.pricePerMeter?.toString() ?: form.pricePerMeter,
+            totalPrice = (unit.finalPrice ?: unit.totalPrice)?.toString() ?: form.totalPrice,
+            installmentCount = unit.suggestedInstallmentCount?.toString() ?: form.installmentCount,
+            installmentAmount = unit.suggestedInstallment?.toString() ?: form.installmentAmount,
+            deliveryDate = form.deliveryDate.ifBlank { unit.deliveryDate.orEmpty() },
+        )
     }
 
     fun update(transform: (PreFileForm) -> PreFileForm) { form = transform(form) }
@@ -365,29 +324,15 @@ class PreFileEditViewModel(
         viewModelScope.launch {
             if (form.projectId.isBlank()) return@launch
             val entity = form.toEntity(existing, selectedUnit)
-            val shouldGenerate = autoGenerateInstallments &&
-                (existing == null || existing?.installmentCount != entity.installmentCount ||
-                    existing?.installmentStartDate != entity.installmentStartDate)
-            repository.save(entity, regenerateInstallments = shouldGenerate)
-            isSaved = true
+            repository.save(entity)
             onSaved(entity.id)
         }
-    }
-
-    /** تغییر تنظیم «ساخت خودکار اقساط» از دل فرم */
-    fun setAutoGenerate(value: Boolean) { autoGenerateInstallments = value }
-
-    /** شماره‌ی بعدی برای دکمه‌ی «پیش‌فایل جدید» در همان نشست */
-    suspend fun refreshDraftNumber(): String {
-        draftsThisSession++
-        return repository.nextDraftNumber()
     }
 }
 
 class PreFileDetailViewModel(
     private val repository: PreFileRepository,
     private val unitRepository: UnitRepository,
-    private val customerRepository: CustomerRepository,
     private val followUpRepository: FollowUpRepository,
 ) : ViewModel() {
 
@@ -396,10 +341,6 @@ class PreFileDetailViewModel(
     val row: StateFlow<PreFileRow?> = preFileId
         .flatMapLatest { id -> if (id == null) flowOf(null) else repository.observeRowById(id) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
-
-    val installments: StateFlow<List<InstallmentEntity>> = preFileId
-        .flatMapLatest { id -> if (id == null) flowOf(emptyList()) else repository.observeInstallments(id) }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val unit: StateFlow<UnitEntity?> = preFileId
         .flatMapLatest { id ->
@@ -410,48 +351,13 @@ class PreFileDetailViewModel(
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
-    val customer: StateFlow<CustomerEntity?> = preFileId
-        .flatMapLatest { id ->
-            if (id == null) flowOf(null)
-            else repository.observeById(id).map { it?.customerId }.flatMapLatest { customerId ->
-                if (customerId == null) flowOf(null) else customerRepository.observeById(customerId)
-            }
-        }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
-
-    val followUps = preFileId
-        .flatMapLatest { id -> if (id == null) flowOf(emptyList()) else followUpRepository.observeByPreFile(id) }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
-
-    val isSaved = MutableStateFlow(false)
-
     fun setPreFileId(id: String) { preFileId.value = id }
 
     fun changeStatus(status: String) {
         val current = row.value?.preFile ?: return
         viewModelScope.launch {
-            repository.save(
-                current.copy(
-                    status = status,
-                    confirmedDate = if (status == Constants.PREFILE_CONFIRMED) Formatters.todayJalali() else current.confirmedDate,
-                    cancelDate = if (status == Constants.PREFILE_CANCELED) Formatters.todayJalali() else current.cancelDate,
-                )
-            )
+            repository.save(current.copy(status = status))
         }
-    }
-
-    fun payInstallment(installmentId: String, amount: Long, method: String?, reference: String?) {
-        viewModelScope.launch {
-            repository.markInstallmentPaid(installmentId, amount, paymentMethod = method, referenceNumber = reference)
-        }
-    }
-
-    fun unpayInstallment(installmentId: String) {
-        viewModelScope.launch { repository.markInstallmentUnpaid(installmentId) }
-    }
-
-    fun completeFollowUp(followUpId: String, outcome: String?) {
-        viewModelScope.launch { followUpRepository.markDone(followUpId, outcome) }
     }
 
     fun delete(onDone: () -> Unit) {

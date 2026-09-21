@@ -7,8 +7,8 @@ import androidx.room.PrimaryKey
 import java.util.UUID
 
 /**
- * پروژه ساختمانی (مثلاً «برج نگین شهرک غرب»).
- * هر پروژه شامل چند بلوک و واحد است و پیش‌فایل‌ها به آن متصل می‌شوند.
+ * پروژه ساختمانی.
+ * مدل قیمت‌گذاری پروژه: متری (METER)، واریزی و امتیاز (DEPOSIT_BONUS)، یا سهامی (SHARE).
  */
 @Entity(
     tableName = "projects",
@@ -26,6 +26,10 @@ data class ProjectEntity(
 
     /** نوع پروژه: مسکونی، تجاری، اداری، مختلط */
     val projectType: String? = null,
+
+    /** مدل قیمت‌گذاری: METER (متری) / DEPOSIT_BONUS (واریزی و امتیاز) / SHARE (سهامی) */
+    @ColumnInfo(name = "pricingModel")
+    val pricingModel: String = "METER",
 
     // --- موقعیت مکانی ---
     val province: String? = null,
@@ -92,7 +96,7 @@ data class ProjectEntity(
     @ColumnInfo(name = "land_area_document")
     val landDeedNumber: String? = null,
 
-    // --- متره و برآورد ---
+    // --- متره و برآورد / مالی پیش‌فرض پروژه ---
     /** قیمت تمام‌شده هر مترمربع (ریال/تومان) */
     @ColumnInfo(name = "cost_per_meter")
     val costPerMeter: Long? = null,
@@ -100,6 +104,18 @@ data class ProjectEntity(
     /** قیمت فروش هر مترمربع (میانگین) */
     @ColumnInfo(name = "sale_price_per_meter")
     val salePricePerMeter: Long? = null,
+
+    /** مبلغ پیش‌فرض واریزی پروژه تا امروز (برای پروژه‌های واریزی-امتیازی) */
+    @ColumnInfo(name = "default_deposit_amount")
+    val defaultDepositAmount: Long? = null,
+
+    /** متراژ هر سهم (برای پروژه‌های سهامی) */
+    @ColumnInfo(name = "share_meter_area")
+    val shareMeterArea: Double? = null,
+
+    /** قیمت هر سهم (برای پروژه‌های سهامی) */
+    @ColumnInfo(name = "share_price")
+    val sharePrice: Long? = null,
 
     /** بودجه کل پروژه */
     @ColumnInfo(name = "total_budget")
@@ -164,11 +180,10 @@ data class ProjectEntity(
     val isFavorite: Boolean = false,
     val isArchived: Boolean = false,
 
-    // --- میدان‌های آماده برای همگام‌سازی (Sync-ready) ---
+    // --- میدان‌های همگام‌سازی ---
     @ColumnInfo(name = "remoteId")
     val remoteId: String? = null,
 
-    /** CLEAN / PENDING_UPLOAD / PENDING_DELETE */
     @ColumnInfo(name = "syncState")
     val syncState: String = "PENDING_UPLOAD",
 
@@ -178,7 +193,6 @@ data class ProjectEntity(
     @ColumnInfo(name = "updatedAt")
     val updatedAt: Long = System.currentTimeMillis(),
 
-    /** زمان آخرین تغییر روی سرور (برای حل تعارض) */
     @ColumnInfo(name = "serverUpdatedAt")
     val serverUpdatedAt: Long? = null,
 
