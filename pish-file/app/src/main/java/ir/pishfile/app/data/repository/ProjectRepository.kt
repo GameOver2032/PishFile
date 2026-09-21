@@ -27,6 +27,8 @@ class ProjectRepository(private val dao: ProjectDao) {
         }
     }
 
+    suspend fun toggleFavorite(id: String, favorite: Boolean) = dao.setFavorite(id, favorite)
+    
     suspend fun delete(id: String) = dao.softDelete(id)
 
     companion object {
