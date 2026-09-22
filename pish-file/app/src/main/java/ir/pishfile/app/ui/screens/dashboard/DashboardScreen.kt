@@ -179,18 +179,18 @@ fun DashboardScreen(
                                 Constants.PRICING_DEPOSIT_BONUS -> {
                                     InfoRow("واریزی پروژه تا امروز", Formatters.amountWithUnit(pf.depositAmount))
                                     InfoRow("مبلغ امتیاز (سود)", Formatters.amountWithUnit(pf.bonusAmount))
-                                    InfoRow("مجموع واریزی + امتیاز", Formatters.amountWithUnit(pf.computedTotal), emphasize = true)
+                                    InfoRow("قیمت کل (واریزی + امتیاز)", Formatters.amountWithUnit(pf.displayPrice), emphasize = true)
                                 }
                                 Constants.PRICING_SHARE -> {
                                     InfoRow("متراژ هر سهم", pf.shareMeterArea?.let { "${Formatters.number(it.toInt())} م²" })
                                     InfoRow("تعداد سهم", Formatters.number(pf.shareCount))
                                     InfoRow("قیمت هر سهم", Formatters.amountWithUnit(pf.sharePrice))
-                                    InfoRow("مبلغ کل سهام", Formatters.amountWithUnit(pf.computedTotal), emphasize = true)
+                                    InfoRow("قیمت کل (مبلغ سهام)", Formatters.amountWithUnit(pf.displayPrice), emphasize = true)
                                 }
                                 else -> { // METER
                                     InfoRow("متراژ", pf.meterArea?.let { "${Formatters.number(it.toInt())} م²" })
                                     InfoRow("قیمت هر متر", Formatters.amountWithUnit(pf.pricePerMeter))
-                                    InfoRow("مبلغ کل", Formatters.amountWithUnit(pf.displayPrice), emphasize = true)
+                                    InfoRow("قیمت کل", Formatters.amountWithUnit(pf.displayPrice), emphasize = true)
                                 }
                             }
 

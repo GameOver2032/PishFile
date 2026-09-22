@@ -203,14 +203,14 @@ class PreFileListViewModel(private val repository: PreFileRepository) : ViewMode
     fun delete(id: String) { viewModelScope.launch { repository.delete(id) } }
 }
 
-class PreFileEditViewModel(
-    private val repository: PreFileRepository,
-    private val projectRepository: ProjectRepository,
-    private val unitRepository: UnitRepository,
+open class PreFileEditViewModel(
+    protected val repository: PreFileRepository,
+    protected val projectRepository: ProjectRepository,
+    protected val unitRepository: UnitRepository,
 ) : ViewModel() {
 
     var form by mutableStateOf(PreFileForm())
-        private set
+        protected set
 
     var projects by mutableStateOf<List<ProjectEntity>>(emptyList())
         private set
@@ -243,11 +243,14 @@ class PreFileEditViewModel(
         if (isLoaded) return
         viewModelScope.launch {
             projects = projectRepository.getAll()
+            // اگر واحد مشخص شد ولی پروژه نه، پروژه از خودِ واحد گرفته می‌شود
+            val givenUnit = unitId?.takeIf { it.isNotBlank() }?.let { unitRepository.getById(it) }
             val defaultProject = projectId?.takeIf { it.isNotBlank() }
+                ?: givenUnit?.projectId
                 ?: projects.firstOrNull()?.id.orEmpty()
 
             availableUnits = unitRepository.getByProject(defaultProject)
-            selectedUnit = unitId?.takeIf { it.isNotBlank() }?.let { unitRepository.getById(it) }
+            selectedUnit = givenUnit
                 ?: availableUnits.firstOrNull { it.status == Constants.UNIT_AVAILABLE }
 
             form = PreFileForm(
@@ -270,14 +273,23 @@ class PreFileEditViewModel(
         }
     }
 
-    /** با انتخاب پروژه، مدل قیمت‌گذاری و شرایط مخصوص پروژه خودکار پر می‌شود */
+    /**
+     * با انتخاب پروژه، فرم به «حالت پیش‌فرض همان پروژه» بازمی‌گردد:
+     * فیلدهای مخصوص فایل (شماره، تاریخ، مالک، وضعیت) حفظ می‌شوند و
+     * بقیه از پیش‌فرض‌های پروژه پر می‌شوند.
+     */
     fun selectProject(projectId: String) {
         viewModelScope.launch {
             availableUnits = unitRepository.getByProject(projectId)
             val project = projects.firstOrNull { it.id == projectId }
-            form = form.copy(
+            val kept = form
+            form = PreFileForm(
+                draftNumber = kept.draftNumber,
+                draftDate = kept.draftDate,
                 projectId = projectId,
-                unitId = "",
+                ownerName = kept.ownerName,
+                ownerPhone = kept.ownerPhone,
+                status = kept.status,
             )
             selectedUnit = null
             if (project != null) {
@@ -286,15 +298,39 @@ class PreFileEditViewModel(
         }
     }
 
+    /** پروژه‌ی انتخاب‌شده در فرم */
+    fun selectedProject(): ProjectEntity? = projects.firstOrNull { it.id == form.projectId }
+
+    /**
+     * با انتخاب پروژه، همه‌ی پیش‌فرض‌های آن روی فرم می‌نشیند:
+     * مدل قیمت‌گذاری، واریزی تا امروز، متری/سهم، امتیاز، رتبه،
+     * شرایط فروش، اقساط و تاریخ تحویل. کاربر فقط فیلدهای خالی را می‌پرند.
+     */
     private fun applyProjectToForm(project: ProjectEntity) {
         val model = project.pricingModel.ifBlank { Constants.PRICING_METER }
         form = form.copy(
             pricingModel = model,
             pricePerMeter = project.salePricePerMeter?.toString() ?: form.pricePerMeter,
             depositAmount = project.defaultDepositAmount?.toString() ?: form.depositAmount,
+            bonusAmount = project.defaultBonusAmount?.toString() ?: form.bonusAmount,
             shareMeterArea = project.shareMeterArea?.toString() ?: form.shareMeterArea,
             sharePrice = project.sharePrice?.toString() ?: form.sharePrice,
             deliveryDate = form.deliveryDate.ifBlank { project.deliveryDate.orEmpty() },
+            hasRanking = project.hasRanking,
+            ranking = if (project.hasRanking) {
+                project.defaultRanking?.takeIf { it.isNotBlank() } ?: "رتبه "
+            } else {
+                ""
+            },
+            saleConditionCash = project.saleConditionCash,
+            saleConditionInstallment = project.saleConditionInstallment,
+            saleConditionExchange = project.saleConditionExchange,
+            saleConditionNotes = project.saleConditionNotes.orEmpty(),
+            installmentCount = project.installmentCount?.toString() ?: form.installmentCount,
+            remainingInstallmentsCount = project.remainingInstallmentsCount?.toString() ?: form.remainingInstallmentsCount,
+            installmentAmount = project.installmentAmount?.toString() ?: form.installmentAmount,
+            installmentPeriod = project.installmentPeriod?.takeIf { it.isNotBlank() } ?: form.installmentPeriod,
+            nextInstallmentDueDate = project.nextInstallmentDueDate?.takeIf { it.isNotBlank() } ?: form.nextInstallmentDueDate,
         )
     }
 
@@ -311,7 +347,13 @@ class PreFileEditViewModel(
             unitId = unit.id,
             meterArea = unit.grossArea?.toString() ?: form.meterArea,
             pricePerMeter = unit.pricePerMeter?.toString() ?: form.pricePerMeter,
-            totalPrice = (unit.finalPrice ?: unit.totalPrice)?.toString() ?: form.totalPrice,
+            // قیمت کلِ متریِ واحد فقط برای فایل‌های متری معنادار است
+            // (در مدل واریزی-امتیاز، قیمت کل = واریزی + امتیاز است)
+            totalPrice = if (form.pricingModel == Constants.PRICING_METER) {
+                (unit.finalPrice ?: unit.totalPrice)?.toString() ?: form.totalPrice
+            } else {
+                form.totalPrice
+            },
             installmentCount = unit.suggestedInstallmentCount?.toString() ?: form.installmentCount,
             installmentAmount = unit.suggestedInstallment?.toString() ?: form.installmentAmount,
             deliveryDate = form.deliveryDate.ifBlank { unit.deliveryDate.orEmpty() },
@@ -327,6 +369,144 @@ class PreFileEditViewModel(
             repository.save(entity)
             onSaved(entity.id)
         }
+    }
+}
+
+/** قدم‌های ثبت سریع فایل پیش‌فروش */
+enum class PreFileWizardStep(val title: String) {
+    PROJECT("پروژه و واحد"),
+    OWNER("مالک / سپارنده فایل"),
+    PRICE("قیمت فایل"),
+    RANK("رتبه در پروژه"),
+    SALE("شرایط فروش"),
+    INSTALLMENT("اقساط"),
+    STATUS("وضعیت و تحویل"),
+}
+
+/**
+ * ثبت سریع فایل پیش‌فروش به‌صورت قدم‌به‌قدم:
+ * پروژه یک‌بار کامل تعریف می‌شود (پیش‌فرض‌ها روی پروژه) و در ثبت فایل
+ * برنامه فقط فیلدهای خالی را می‌پرسد. قیمت کل (واریزی + امتیاز) همیشه
+ * به‌عنوان یک فیلد مشخص به‌روزرسانی می‌شود.
+ */
+class PreFileWizardViewModel(
+    repository: PreFileRepository,
+    projectRepository: ProjectRepository,
+    unitRepository: UnitRepository,
+) : PreFileEditViewModel(repository, projectRepository, unitRepository) {
+
+    var currentStepIndex by mutableStateOf(0)
+        private set
+    var stepError by mutableStateOf<String?>(null)
+        private set
+
+    /** فهرست قدم‌ها بر اساس پیش‌فرض‌های پروژه‌ی انتخاب‌شده */
+    fun steps(project: ProjectEntity?): List<PreFileWizardStep> = buildList {
+        add(PreFileWizardStep.PROJECT)
+        add(PreFileWizardStep.OWNER)
+        add(PreFileWizardStep.PRICE)
+        if (project?.hasRanking == true) add(PreFileWizardStep.RANK)
+        add(PreFileWizardStep.SALE)
+        add(PreFileWizardStep.INSTALLMENT)
+        add(PreFileWizardStep.STATUS)
+    }
+
+    /** قدم جاری (با محدودسازی امن در صورت تغییر پروژه) */
+    fun currentStep(): PreFileWizardStep {
+        val list = steps(selectedProject())
+        return list.getOrNull(currentStepIndex.coerceIn(0, list.size - 1)) ?: list.last()
+    }
+
+    /** قدم‌های انتخابی (همه‌چیز از پیش‌فرض پروژه پر شده و قابل رد کردن است) */
+    fun isOptionalStep(step: PreFileWizardStep): Boolean = when (step) {
+        PreFileWizardStep.SALE, PreFileWizardStep.INSTALLMENT, PreFileWizardStep.STATUS -> true
+        else -> false
+    }
+
+    /** اعتبارسنجی قدم جاری؛ در صورت خطا، پیام روی stepError می‌نشیند */
+    fun validateCurrentStep(): Boolean {
+        stepError = when (currentStep()) {
+            PreFileWizardStep.PROJECT ->
+                if (form.projectId.isBlank()) "ابتدا یک پروژه انتخاب کنید" else null
+            PreFileWizardStep.OWNER ->
+                if (form.ownerName.isBlank()) "نام مالک / سپارنده را وارد کنید" else null
+            PreFileWizardStep.PRICE ->
+                if (form.computedTotal <= 0) "مبلغ امتیاز یا قیمت کل را وارد کنید" else null
+            PreFileWizardStep.RANK -> {
+                // پیش‌فرض «رتبه » به‌تنهایی کافی نیست؛ باید مقدار مشخصی بنویسد
+                val meaningful = form.ranking.trim().removePrefix("رتبه").trim()
+                if (meaningful.isEmpty()) "رتبه فایل را بنویسید (مثلاً: رتبه ۱۲)" else null
+            }
+            else -> null
+        }
+        return stepError == null
+    }
+
+    /** رفتن به قدم بعدی؛ در قدم آخر، ثبت فایل */
+    fun next(onSaved: (String) -> Unit) {
+        if (!validateCurrentStep()) return
+        val list = steps(selectedProject())
+        if (currentStepIndex >= list.size - 1) {
+            save(onSaved)
+        } else {
+            currentStepIndex++
+            stepError = null
+        }
+    }
+
+    /** بازگشت به قدم قبل */
+    fun back() {
+        if (currentStepIndex > 0) {
+            currentStepIndex--
+            stepError = null
+        }
+    }
+
+    /** پرش مستقیم (برای قدم‌های انتخابی) */
+    fun goTo(index: Int) {
+        val list = steps(selectedProject())
+        if (index in list.indices) {
+            currentStepIndex = index
+            stepError = null
+        }
+    }
+
+    // ---------- همگام‌سازی دوطرفه‌ی قیمت (مدل واریزی و امتیاز) ----------
+    // قانون: قیمت کل پیشنهادی مالک = واریزی + امتیاز
+    // تغییر هرکدام، دیگری را تنظیم می‌کند.
+
+    private fun syncTotal(f: PreFileForm): String {
+        if (f.pricingModel != Constants.PRICING_DEPOSIT_BONUS) return f.totalPrice
+        val total = f.computedTotal
+        return if (total > 0) Formatters.amount(total) else ""
+    }
+
+    /** کاربر مبلغ امتیاز را تغییر داد → قیمت کل به‌روز می‌شود */
+    fun onBonusChange(v: String) {
+        val f = form.copy(bonusAmount = v)
+        form = f.copy(totalPrice = syncTotal(f))
+    }
+
+    /** کاربر واریزی را تغییر داد → قیمت کل به‌روز می‌شود */
+    fun onDepositChange(v: String) {
+        val f = form.copy(depositAmount = v)
+        form = f.copy(totalPrice = syncTotal(f))
+    }
+
+    /** کاربر مستقیم قیمت کل را نوشت → امتیاز از آن کمّیت می‌شود */
+    fun onTotalChange(v: String) {
+        if (form.pricingModel != Constants.PRICING_DEPOSIT_BONUS) {
+            form = form.copy(totalPrice = v)
+            return
+        }
+        val total = Formatters.parseLong(v)
+        if (total == null || total <= 0) {
+            form = form.copy(totalPrice = "")
+            return
+        }
+        val bonus = (total - form.depositValue).coerceAtLeast(0L)
+        val f = form.copy(bonusAmount = if (bonus > 0) Formatters.amount(bonus) else "")
+        form = f.copy(totalPrice = syncTotal(f))
     }
 }
 

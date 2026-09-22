@@ -2,7 +2,9 @@
 
 # مدل داده — فیلدهای تخصصی پیش‌فروش املاک
 
-دیتابیس: SQLite با Room — نام فایل: `pishfile.db` (نسخه ۱).
+دیتابیس: SQLite با Room — نام فایل: `pishfile.db` (نسخه ۳).
+
+> **مهاجرت ۲ به ۳:** جدول `projects` با `ALTER TABLE … ADD COLUMN` به‌روزرسانی شده است (مهاجرت واقعی در `PishFileDatabase.MIGRATION_2_3`)؛ یعنی **داده‌های کاربر هنگام به‌روزرسانی حفظ می‌شود** و نیازی به بکاپ و نصب مجدد نیست.
 همه‌ی تاریخ‌ها **شمسی** و با قالب `YYYY/MM/DD` و رقم لاتین ذخیره می‌شوند (مثال: `1405/06/29`) و به تومان هستند.
 
 ## فهرست جدول‌ها
@@ -36,12 +38,18 @@ customers ───────────────────────�
 | موقعیت | `province`, `city`, `district`, `address`, `postalCode`, `latitude`, `longitude` |
 | فنی | `landArea`, `totalBuiltArea`, `blockCount`, `floorCount`, `unitCount`, `unitsPerFloor`, `parkingCount`, `elevatorCount`, `structureType`, `heatingSystem` |
 | مجوز | `permitNumber`, `permitIssueDate`, `permitExpiryDate`, `landDeedNumber` |
-| مالی | `costPerMeter`, `salePricePerMeter`, `totalBudget` |
+| مالی | `costPerMeter`, `salePricePerMeter`, `defaultDepositAmount`, `shareMeterArea`, `sharePrice`, `totalBudget` |
+| **پیش‌فرض‌های ثبت فایل** | `defaultBonusAmount`, `hasRanking`, `defaultRanking`, `saleConditionCash/Installment/Exchange`, `saleConditionNotes`, `installmentCount`, `remainingInstallmentsCount`, `installmentAmount`, `installmentPeriod`, `nextInstallmentDueDate` |
 | پیشرفت | `phase`, `progressPercent`, `startDate`, `deliveryDate`, `deliveryFrom` |
 | افراد | `contractorName/Phone`, `supervisorName/Phone`, `developerName`, `salesManagerPhone` |
 | سایر | `facilities`, `description`, `tags`, `isFavorite`, `isArchived` |
 
 مراحل پروژه (`phase`): `PLANNING`، `EXCAVATION`، `STRUCTURE`، `FINISHING`، `DELIVERED`.
+
+> **پیش‌فرض‌های ثبت فایل (نسخه ۰.۳.۰):** این فیلدها همه‌ی مقادیری هستند که قبلاً برای **هر فایل** جداگانه پر می‌شد و در واحدهای یک پروژه با هم یکسان‌اند
+> (واریزی تا امروز، امتیاز، رتبه، شرایط فروش، اقساط). حالا یک‌بار روی پروژه ثبت می‌شوند و در «ثبت سریع فایل»
+> خودکار پر می‌شوند؛ برنامه فقط فیلدهای خالی (مثلاً نام مالک، امتیاز خاصِ آن فایل و رتبه) را می‌پرسد.
+> **قیمت کل** هر فایل همیشه `واریزی + امتیاز` (یا معادل آن در مدل‌های متری/سهامی) است و با همین عنوان در همه‌ی نماها نمایش داده می‌شود.
 
 ## جدول `units` (واحد)
 

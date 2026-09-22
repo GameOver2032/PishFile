@@ -36,6 +36,7 @@ import ir.pishfile.app.ui.screens.followups.FollowUpsScreen
 import ir.pishfile.app.ui.screens.prefiles.PreFileDetailScreen
 import ir.pishfile.app.ui.screens.prefiles.PreFileEditScreen
 import ir.pishfile.app.ui.screens.prefiles.PreFileListScreen
+import ir.pishfile.app.ui.screens.prefiles.PreFileWizardScreen
 import ir.pishfile.app.ui.screens.projects.ProjectDetailScreen
 import ir.pishfile.app.ui.screens.projects.ProjectEditScreen
 import ir.pishfile.app.ui.screens.projects.ProjectListScreen
@@ -283,12 +284,12 @@ fun MainScreen() {
                     navArgument("unitId") { type = NavType.StringType; defaultValue = "" },
                 ),
             ) { entry ->
-                PreFileEditScreen(
-                    preFileId = null,
+                PreFileWizardScreen(
                     initialProjectId = entry.arguments?.getString("projectId").orEmpty(),
                     initialUnitId = entry.arguments?.getString("unitId").orEmpty(),
                     onBack = { navController.popBackStack() },
                     onSaved = { id -> navController.navigate(Routes.preFile(id)) },
+                    onOpenProjects = { navController.navigate(Routes.PROJECTS) },
                 )
             }
             composable(

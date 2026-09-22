@@ -175,7 +175,7 @@ private fun PreFileCard(
                             style = MaterialTheme.typography.labelSmall,
                         )
                         Text(
-                            "مجموع: ${Formatters.amountShort(preFile.computedTotal)} تومان",
+                            "قیمت کل: ${Formatters.amountShort(preFile.displayPrice)} تومان",
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary,
@@ -187,7 +187,7 @@ private fun PreFileCard(
                             style = MaterialTheme.typography.labelSmall,
                         )
                         Text(
-                            "کل: ${Formatters.amountShort(preFile.computedTotal)} تومان",
+                            "قیمت کل: ${Formatters.amountShort(preFile.displayPrice)} تومان",
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary,
@@ -199,7 +199,7 @@ private fun PreFileCard(
                             style = MaterialTheme.typography.labelSmall,
                         )
                         Text(
-                            "قیمت: ${Formatters.amountShort(preFile.displayPrice)} تومان",
+                            "قیمت کل: ${Formatters.amountShort(preFile.displayPrice)} تومان",
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary,
@@ -364,7 +364,7 @@ fun PreFileEditScreen(
                         ) {
                             Column(Modifier.padding(12.dp)) {
                                 Text(
-                                    "مجموع پرداختی خریدار (واریزی + امتیاز):",
+                                    "قیمت کل (واریزی + امتیاز):",
                                     style = MaterialTheme.typography.bodySmall,
                                 )
                                 Text(
@@ -407,7 +407,7 @@ fun PreFileEditScreen(
                         ) {
                             Column(Modifier.padding(12.dp)) {
                                 Text(
-                                    "مبلغ کل سهام:",
+                                    "قیمت کل (مبلغ کل سهام):",
                                     style = MaterialTheme.typography.bodySmall,
                                 )
                                 Text(
@@ -441,7 +441,7 @@ fun PreFileEditScreen(
                         MoneyField(
                             value = form.totalPrice.ifBlank { form.computedTotal.toString() },
                             onValueChange = { v -> viewModel.update { it.copy(totalPrice = v) } },
-                            label = "مبلغ کل فایل",
+                            label = "قیمت کل فایل",
                             helperText = "از حاصل‌ضرب متراژ در قیمت هر متر محاسبه می‌شود",
                         )
                     }
@@ -680,18 +680,18 @@ fun PreFileDetailScreen(
                     Constants.PRICING_DEPOSIT_BONUS -> {
                         InfoRow("مبلغ واریزی تا امروز", Formatters.amountWithUnit(pf.depositAmount))
                         InfoRow("مبلغ امتیاز (سود پروژه)", Formatters.amountWithUnit(pf.bonusAmount))
-                        InfoRow("مجموع پرداختی خرید (واریزی + امتیاز)", Formatters.amountWithUnit(pf.computedTotal), emphasize = true)
+                        InfoRow("قیمت کل (واریزی + امتیاز)", Formatters.amountWithUnit(pf.displayPrice), emphasize = true)
                     }
                     Constants.PRICING_SHARE -> {
                         InfoRow("متراژ هر سهم", pf.shareMeterArea?.let { "${Formatters.number(it.toInt())} م²" })
                         InfoRow("تعداد سهم", Formatters.number(pf.shareCount))
                         InfoRow("قیمت هر سهم", Formatters.amountWithUnit(pf.sharePrice))
-                        InfoRow("مبلغ کل سهام", Formatters.amountWithUnit(pf.computedTotal), emphasize = true)
+                        InfoRow("قیمت کل (مبلغ سهام)", Formatters.amountWithUnit(pf.displayPrice), emphasize = true)
                     }
                     else -> { // METER
                         InfoRow("متراژ", pf.meterArea?.let { "${Formatters.number(it.toInt())} م²" })
                         InfoRow("قیمت هر مترمربع", Formatters.amountWithUnit(pf.pricePerMeter))
-                        InfoRow("مبلغ کل فایل", Formatters.amountWithUnit(pf.displayPrice), emphasize = true)
+                        InfoRow("قیمت کل", Formatters.amountWithUnit(pf.displayPrice), emphasize = true)
                     }
                 }
             }

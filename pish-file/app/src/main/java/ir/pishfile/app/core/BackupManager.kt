@@ -28,7 +28,7 @@ class BackupManager(
     suspend fun exportFullBackup(): File {
         val root = JSONObject()
         root.put("app", "PishFile")
-        root.put("version", 2)
+        root.put("version", 3)
         root.put("exportedAt", System.currentTimeMillis())
 
         root.put("projects", JSONArray(database.projectDao().getAll().map { projectToJson(it) }))
@@ -74,7 +74,7 @@ class BackupManager(
                     (p.bonusAmount ?: 0).toString(),
                     (p.pricePerMeter ?: 0).toString(),
                     (p.meterArea ?: 0.0).toString(),
-                    p.computedTotal.toString(),
+                    p.displayPrice.toString(),
                     if (p.hasRanking) p.ranking.orEmpty() else "",
                     p.saleConditionsSummary,
                     (p.installmentCount ?: 0).toString(),
@@ -163,6 +163,13 @@ class BackupManager(
         put("address", p.address)
         put("salePricePerMeter", p.salePricePerMeter); put("defaultDepositAmount", p.defaultDepositAmount)
         put("shareMeterArea", p.shareMeterArea); put("sharePrice", p.sharePrice)
+        put("defaultBonusAmount", p.defaultBonusAmount)
+        put("hasRanking", p.hasRanking); put("defaultRanking", p.defaultRanking)
+        put("saleConditionCash", p.saleConditionCash); put("saleConditionInstallment", p.saleConditionInstallment)
+        put("saleConditionExchange", p.saleConditionExchange); put("saleConditionNotes", p.saleConditionNotes)
+        put("installmentCount", p.installmentCount); put("remainingInstallmentsCount", p.remainingInstallmentsCount)
+        put("installmentAmount", p.installmentAmount); put("installmentPeriod", p.installmentPeriod)
+        put("nextInstallmentDueDate", p.nextInstallmentDueDate)
         put("phase", p.phase); put("progressPercent", p.progressPercent)
         put("deliveryDate", p.deliveryDate); put("facilities", p.facilities); put("description", p.description)
         put("createdAt", p.createdAt); put("updatedAt", p.updatedAt)
@@ -225,6 +232,18 @@ class BackupManager(
         defaultDepositAmount = o.long("defaultDepositAmount"),
         shareMeterArea = o.double("shareMeterArea"),
         sharePrice = o.long("sharePrice"),
+        defaultBonusAmount = o.long("defaultBonusAmount"),
+        hasRanking = o.optBoolean("hasRanking", false),
+        defaultRanking = o.text("defaultRanking"),
+        saleConditionCash = o.optBoolean("saleConditionCash", true),
+        saleConditionInstallment = o.optBoolean("saleConditionInstallment", false),
+        saleConditionExchange = o.optBoolean("saleConditionExchange", false),
+        saleConditionNotes = o.text("saleConditionNotes"),
+        installmentCount = o.int("installmentCount"),
+        remainingInstallmentsCount = o.int("remainingInstallmentsCount"),
+        installmentAmount = o.long("installmentAmount"),
+        installmentPeriod = o.text("installmentPeriod"),
+        nextInstallmentDueDate = o.text("nextInstallmentDueDate"),
         phase = o.optString("phase", "PLANNING"),
         progressPercent = o.optInt("progressPercent", 0),
         deliveryDate = o.text("deliveryDate"),

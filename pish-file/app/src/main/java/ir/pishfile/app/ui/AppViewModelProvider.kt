@@ -11,6 +11,7 @@ import ir.pishfile.app.ui.viewmodel.FollowUpsViewModel
 import ir.pishfile.app.ui.viewmodel.PreFileDetailViewModel
 import ir.pishfile.app.ui.viewmodel.PreFileEditViewModel
 import ir.pishfile.app.ui.viewmodel.PreFileListViewModel
+import ir.pishfile.app.ui.viewmodel.PreFileWizardViewModel
 import ir.pishfile.app.ui.viewmodel.ProjectDetailViewModel
 import ir.pishfile.app.ui.viewmodel.ProjectEditViewModel
 import ir.pishfile.app.ui.viewmodel.ProjectListViewModel
@@ -51,6 +52,13 @@ object AppViewModelProvider {
         initializer { PreFileListViewModel(container().preFileRepository) }
         initializer {
             PreFileEditViewModel(
+                container().preFileRepository,
+                container().projectRepository,
+                container().unitRepository,
+            )
+        }
+        initializer {
+            PreFileWizardViewModel(
                 container().preFileRepository,
                 container().projectRepository,
                 container().unitRepository,

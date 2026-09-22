@@ -291,6 +291,14 @@ fun ProjectEditScreen(
                             value = form.defaultDepositAmount,
                             onValueChange = { v -> viewModel.update { it.copy(defaultDepositAmount = v) } },
                             label = "مبلغ واریزی پیش‌فرض پروژه تا امروز",
+                            helperText = "این مبلغ با تغییر شرایط پروژه، اینجا به‌روز می‌شود",
+                        )
+                        SpacerH(8)
+                        MoneyField(
+                            value = form.defaultBonusAmount,
+                            onValueChange = { v -> viewModel.update { it.copy(defaultBonusAmount = v) } },
+                            label = "پیش‌فرض مبلغ امتیاز (اختیاری)",
+                            helperText = "اگر خالی بماند، هنگام ثبت فایل از کاربر پرسیده می‌شود",
                         )
                     }
                     Constants.PRICING_SHARE -> {
@@ -319,6 +327,113 @@ fun ProjectEditScreen(
                         )
                     }
                 }
+            }
+        }
+
+        // پیش‌فرض‌های ثبت فایل: رتبه، شرایط فروش و اقساط
+        item {
+            SectionCard(
+                title = "پیش‌فرض‌های ثبت فایل",
+                subtitle = "این مقادیر هنگام «ثبت فایل جدید» خودکار پر می‌شوند و فقط فیلدهای خالی از کاربر پرسیده می‌شوند",
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    androidx.compose.material3.Switch(
+                        checked = form.hasRanking,
+                        onCheckedChange = { v -> viewModel.update { it.copy(hasRanking = v) } },
+                    )
+                    Text(
+                        " فایل‌های این پروژه دارای رتبه هستند",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+                if (form.hasRanking) {
+                    SpacerH(8)
+                    ir.pishfile.app.ui.components.FormTextField(
+                        value = form.defaultRanking,
+                        onValueChange = { v -> viewModel.update { it.copy(defaultRanking = v) } },
+                        label = "پیش‌فرض متن رتبه (مثلاً: رتبه اولویت بلوک A)",
+                    )
+                }
+                SpacerH(10)
+                Text("شرایط فروش پیش‌فرض:", style = MaterialTheme.typography.bodySmall)
+                SpacerH(4)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        androidx.compose.material3.Checkbox(
+                            checked = form.saleConditionCash,
+                            onCheckedChange = { v -> viewModel.update { it.copy(saleConditionCash = v) } },
+                        )
+                        Text("نقد", style = MaterialTheme.typography.bodyMedium)
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        androidx.compose.material3.Checkbox(
+                            checked = form.saleConditionInstallment,
+                            onCheckedChange = { v -> viewModel.update { it.copy(saleConditionInstallment = v) } },
+                        )
+                        Text("شرایطی", style = MaterialTheme.typography.bodyMedium)
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        androidx.compose.material3.Checkbox(
+                            checked = form.saleConditionExchange,
+                            onCheckedChange = { v -> viewModel.update { it.copy(saleConditionExchange = v) } },
+                        )
+                        Text("تهاتر", style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+                SpacerH(8)
+                ir.pishfile.app.ui.components.FormTextField(
+                    value = form.saleConditionNotes,
+                    onValueChange = { v -> viewModel.update { it.copy(saleConditionNotes = v) } },
+                    label = "توضیحات پیش‌فرض شرایط فروش (مثلاً نوع خودرو جهت تهاتر)",
+                    singleLine = false,
+                    minLines = 2,
+                )
+                SpacerH(10)
+                Text("اقساط پیش‌فرض پروژه:", style = MaterialTheme.typography.bodySmall)
+                SpacerH(6)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    NumberField(
+                        value = form.installmentCount,
+                        onValueChange = { v -> viewModel.update { it.copy(installmentCount = v) } },
+                        label = "تعداد کل اقساط",
+                        modifier = Modifier.weight(1f),
+                    )
+                    NumberField(
+                        value = form.remainingInstallmentsCount,
+                        onValueChange = { v -> viewModel.update { it.copy(remainingInstallmentsCount = v) } },
+                        label = "اقساط باقی‌مانده",
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                SpacerH(8)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    MoneyField(
+                        value = form.installmentAmount,
+                        onValueChange = { v -> viewModel.update { it.copy(installmentAmount = v) } },
+                        label = "مبلغ هر قسط",
+                        modifier = Modifier.weight(1.2f),
+                    )
+                    DropdownField(
+                        label = "دوره پرداخت",
+                        options = listOf("ماهانه", "دو ماهه", "سه ماهه / فصلی", "شش ماهه", "سالانه"),
+                        selected = form.installmentPeriod.takeIf { it.isNotBlank() },
+                        onSelect = { v -> viewModel.update { it.copy(installmentPeriod = v) } },
+                        allowEmpty = true,
+                        emptyLabel = "انتخاب کنید",
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                SpacerH(8)
+                JalaliDateField(
+                    value = form.nextInstallmentDueDate,
+                    onValueChange = { v -> viewModel.update { it.copy(nextInstallmentDueDate = v) } },
+                    label = "تاریخ سررسید قسط پیش‌رو",
+                    quickMonths = listOf(1, 2, 3),
+                )
             }
         }
 
@@ -451,6 +566,49 @@ fun ProjectDetailScreen(
 
         item {
             SectionCard(
+                title = "پیش‌فرض‌های ثبت فایل",
+                subtitle = "هنگام ثبت فایل جدید، این مقادیر خودکار پر می‌شوند و فقط فیلدهای خالی پرسیده می‌شوند",
+            ) {
+                if (current.pricingModel == Constants.PRICING_DEPOSIT_BONUS) {
+                    InfoRow("پیش‌فرض امتیاز", Formatters.amountWithUnit(current.defaultBonusAmount))
+                }
+                InfoRow(
+                    "رتبه‌بندی فایل‌ها",
+                    when {
+                        !current.hasRanking -> "خیر"
+                        current.defaultRanking.isNullOrBlank() -> "بله — متن رتبه هنگام ثبت پرسیده می‌شود"
+                        else -> "بله — پیش‌فرض: ${current.defaultRanking}"
+                    },
+                    emphasize = current.hasRanking,
+                )
+                InfoRow(
+                    "شرایط فروش پیش‌فرض",
+                    buildList {
+                        if (current.saleConditionCash) add("نقد")
+                        if (current.saleConditionInstallment) add("شرایطی")
+                        if (current.saleConditionExchange) add("تهاتر")
+                    }.joinToString("، ").ifBlank { "تعیین‌نشده" },
+                )
+                InfoRow("توضیحات شرایط فروش", current.saleConditionNotes)
+                InfoRow(
+                    "اقساط پیش‌فرض",
+                    listOfNotNull(
+                        current.installmentCount?.let { "تعداد: ${Formatters.number(it)}" },
+                        current.remainingInstallmentsCount?.let { "مانده: ${Formatters.number(it)}" },
+                        current.installmentAmount?.let { "مبلغ قسط: ${Formatters.amountShort(it)} تومان" },
+                        current.installmentPeriod?.let { "دوره: $it" },
+                    ).joinToString(" • ").ifBlank { "تعیین‌نشده" },
+                )
+                InfoRow(
+                    "سررسید قسط پیش‌رو",
+                    current.nextInstallmentDueDate?.let { Formatters.toPersianDigits(it) },
+                    emphasize = true,
+                )
+            }
+        }
+
+        item {
+            SectionCard(
                 title = "فایل‌های پیش‌فروش این پروژه (${Formatters.number(preFiles.size)})",
             ) {
                 if (preFiles.isEmpty()) {
@@ -477,7 +635,7 @@ fun ProjectDetailScreen(
                                 Text(
                                     listOfNotNull(
                                         row.preFile.ownerName?.let { "مالک: $it" },
-                                        "مبلغ: ${Formatters.amountShort(row.preFile.computedTotal)} تومان",
+                                        "قیمت کل: ${Formatters.amountShort(row.preFile.displayPrice)} تومان",
                                     ).joinToString(" • "),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,

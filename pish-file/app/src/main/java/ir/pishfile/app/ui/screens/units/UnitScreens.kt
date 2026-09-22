@@ -499,7 +499,7 @@ fun UnitDetailScreen(
                                     style = MaterialTheme.typography.bodyMedium,
                                 )
                                 Text(
-                                    "${Formatters.amountShort(row.preFile.computedTotal)} تومان • ${Constants.preFileStatusLabel(row.preFile.status)}",
+                                    "قیمت کل: ${Formatters.amountShort(row.preFile.displayPrice)} تومان • ${Constants.preFileStatusLabel(row.preFile.status)}",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )

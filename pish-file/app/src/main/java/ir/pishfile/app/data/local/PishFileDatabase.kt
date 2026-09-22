@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import ir.pishfile.app.core.Constants
 import ir.pishfile.app.data.local.dao.FollowUpDao
@@ -26,7 +27,7 @@ import java.util.UUID
         PreFileEntity::class,
         FollowUpEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class PishFileDatabase : RoomDatabase() {
@@ -50,9 +51,31 @@ abstract class PishFileDatabase : RoomDatabase() {
                     DB_NAME
                 )
                     .addCallback(SeedCallback(context))
+                    .addMigrations(MIGRATION_2_3)
                     .fallbackToDestructiveMigration()
                     .build()
                     .also { INSTANCE = it }
+            }
+        }
+
+        /**
+         * نسخه‌ی ۲ → ۳: افزودن «پیش‌فرض‌های ثبت فایل» به جدول projects.
+         * مهاجرت واقعی (نه مخرب) تا داده‌های کاربر حفظ شود.
+         */
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE projects ADD COLUMN default_bonus_amount INTEGER")
+                db.execSQL("ALTER TABLE projects ADD COLUMN has_ranking INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE projects ADD COLUMN default_ranking TEXT")
+                db.execSQL("ALTER TABLE projects ADD COLUMN sale_condition_cash INTEGER NOT NULL DEFAULT 1")
+                db.execSQL("ALTER TABLE projects ADD COLUMN sale_condition_installment INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE projects ADD COLUMN sale_condition_exchange INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE projects ADD COLUMN sale_condition_notes TEXT")
+                db.execSQL("ALTER TABLE projects ADD COLUMN installment_count INTEGER")
+                db.execSQL("ALTER TABLE projects ADD COLUMN remaining_installments_count INTEGER")
+                db.execSQL("ALTER TABLE projects ADD COLUMN installment_amount INTEGER")
+                db.execSQL("ALTER TABLE projects ADD COLUMN installment_period TEXT")
+                db.execSQL("ALTER TABLE projects ADD COLUMN next_installment_due_date TEXT")
             }
         }
 
@@ -83,6 +106,18 @@ abstract class PishFileDatabase : RoomDatabase() {
                         city = "تهران",
                         district = "منطقه ۲۲ - چیتگر",
                         defaultDepositAmount = 1_850_000_000L,
+                        defaultBonusAmount = 950_000_000L,
+                        hasRanking = true,
+                        defaultRanking = "رتبه ",
+                        saleConditionCash = true,
+                        saleConditionInstallment = true,
+                        saleConditionExchange = true,
+                        saleConditionNotes = "تهاتر فقط با خودرو ۲۰ یا پارس تا ۵۰۰ میلیون",
+                        installmentCount = 12,
+                        remainingInstallmentsCount = 6,
+                        installmentAmount = 75_000_000L,
+                        installmentPeriod = "ماهانه",
+                        nextInstallmentDueDate = "1405/08/15",
                         phase = Constants.PROJECT_STRUCTURE,
                         progressPercent = 65,
                         deliveryDate = "1406/06/31",
@@ -104,6 +139,10 @@ abstract class PishFileDatabase : RoomDatabase() {
                         city = "تهران",
                         district = "سعادت‌آباد",
                         salePricePerMeter = 160_000_000L,
+                        saleConditionCash = true,
+                        saleConditionInstallment = true,
+                        installmentCount = 24,
+                        installmentPeriod = "ماهانه",
                         phase = Constants.PROJECT_FINISHING,
                         progressPercent = 85,
                         deliveryDate = "1405/11/30",
@@ -126,6 +165,8 @@ abstract class PishFileDatabase : RoomDatabase() {
                         district = "منطقه ۲۲",
                         shareMeterArea = 10.0,
                         sharePrice = 950_000_000L,
+                        saleConditionCash = true,
+                        saleConditionInstallment = true,
                         phase = Constants.PROJECT_EXCAVATION,
                         progressPercent = 25,
                         deliveryDate = "1407/12/29",

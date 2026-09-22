@@ -121,6 +121,58 @@ data class ProjectEntity(
     @ColumnInfo(name = "total_budget")
     val totalBudget: Long? = null,
 
+    // --- پیش‌فرض‌های ثبت فایل (برای ثبت سریع پیش‌فروش) ---
+    /**
+     * پیش‌فرض مبلغ امتیاز (برای پروژه‌های واریزی-امتیازی).
+     * اگر خالی باشد، هنگام ثبت فایل از کاربر پرسیده می‌شود.
+     */
+    @ColumnInfo(name = "default_bonus_amount")
+    val defaultBonusAmount: Long? = null,
+
+    /** آیا فایل‌های این پروژه دارای رتبه در پروژه هستند؟ */
+    @ColumnInfo(name = "has_ranking")
+    val hasRanking: Boolean = false,
+
+    /** پیش‌فرض متن رتبه (مثلاً «رتبه اولویت بلوک A») */
+    @ColumnInfo(name = "default_ranking")
+    val defaultRanking: String? = null,
+
+    /** پیش‌فرض شرایط فروش: نقد */
+    @ColumnInfo(name = "sale_condition_cash")
+    val saleConditionCash: Boolean = true,
+
+    /** پیش‌فرض شرایط فروش: شرایطی */
+    @ColumnInfo(name = "sale_condition_installment")
+    val saleConditionInstallment: Boolean = false,
+
+    /** پیش‌فرض شرایط فروش: تهاتر */
+    @ColumnInfo(name = "sale_condition_exchange")
+    val saleConditionExchange: Boolean = false,
+
+    /** پیش‌فرض توضیحات شرایط فروش (مثلاً نوع خودرو جهت تهاتر) */
+    @ColumnInfo(name = "sale_condition_notes")
+    val saleConditionNotes: String? = null,
+
+    /** تعداد کل اقساط (پیش‌فرض همه‌ی فایل‌های پروژه) */
+    @ColumnInfo(name = "installment_count")
+    val installmentCount: Int? = null,
+
+    /** تعداد اقساط باقی‌مانده (به‌روز روی پروژه) */
+    @ColumnInfo(name = "remaining_installments_count")
+    val remainingInstallmentsCount: Int? = null,
+
+    /** مبلغ هر قسط */
+    @ColumnInfo(name = "installment_amount")
+    val installmentAmount: Long? = null,
+
+    /** دوره‌ی پرداخت اقساط (ماهانه، فصلی و…) */
+    @ColumnInfo(name = "installment_period")
+    val installmentPeriod: String? = null,
+
+    /** تاریخ سررسید قسط پیش‌رو (به‌روز روی پروژه) */
+    @ColumnInfo(name = "next_installment_due_date")
+    val nextInstallmentDueDate: String? = null,
+
     // --- پیشرفت و زمان‌بندی ---
     /** مرحله فعلی پروژه */
     val phase: String = "PLANNING",
