@@ -50,6 +50,8 @@ import ir.pishfile.app.ui.components.FormTextField
 import ir.pishfile.app.ui.components.InfoRow
 import ir.pishfile.app.ui.components.JalaliDateField
 import ir.pishfile.app.ui.components.MoneyField
+import ir.pishfile.app.ui.components.NoteDialog
+import ir.pishfile.app.ui.components.NoteTimelineCard
 import ir.pishfile.app.ui.components.NumberField
 import ir.pishfile.app.ui.components.SearchField
 import ir.pishfile.app.ui.components.SectionCard
@@ -618,9 +620,12 @@ fun PreFileDetailScreen(
 
     val row by viewModel.row.collectAsStateWithLifecycle()
     val unit by viewModel.unit.collectAsStateWithLifecycle()
+    val customers by viewModel.customers.collectAsStateWithLifecycle()
+    val notes by viewModel.notes.collectAsStateWithLifecycle()
 
     var showDelete by remember { mutableStateOf(false) }
     var showStatusMenu by remember { mutableStateOf(false) }
+    var showNoteDialog by remember { mutableStateOf(false) }
 
     val currentRow = row ?: return
     val pf = currentRow.preFile
@@ -739,9 +744,110 @@ fun PreFileDetailScreen(
             }
         }
 
+        // --- مشتریان این فایل ---
+        item {
+            SectionCard(
+                title = "مشتریان این فایل",
+                subtitle = "طرف‌مذاکره‌هایی که روی این فایل پیگیری می‌کنید",
+                trailing = {
+                    OutlinedButton(onClick = onNewCustomer) { Text("مشتری جدید") }
+                },
+            ) {
+                if (customers.isEmpty()) {
+                    Text(
+                        "هنوز مشتری‌ای برای این فایل ثبت نشده",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        customers.forEach { customer ->
+                            Card(
+                                onClick = { onOpenCustomer(customer.id) },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                                shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
+                            ) {
+                                Row(
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .padding(10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Column(Modifier.weight(1f)) {
+                                        Text(
+                                            customer.name,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.Bold,
+                                        )
+                                        Text(
+                                            listOfNotNull(
+                                                customer.phone,
+                                                Constants.customerRoleLabel(customer.role),
+                                            ).joinToString(" • "),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                    StatusChip(
+                                        Constants.customerStatusLabel(customer.status),
+                                        if (customer.status == Constants.CUSTOMER_ACTIVE) MaterialTheme.colorScheme.primary
+                                        else MaterialTheme.colorScheme.secondary,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // --- مکالمات و نوت‌ها ---
+        item {
+            SectionCard(
+                title = "مکالمات و نوت‌ها",
+                subtitle = "تاریخچه‌ی پیگیری‌ها و نتیجه‌ی مکالمات",
+                trailing = {
+                    OutlinedButton(onClick = { showNoteDialog = true }) { Text("نوت جدید") }
+                },
+            ) {
+                if (notes.isEmpty()) {
+                    Text(
+                        "مکالمه‌ای ثبت نشده — با «نوت جدید» اولین مکالمه را ثبت کنید",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        notes.forEach { note ->
+                            NoteTimelineCard(
+                                note = note,
+                                contextLine = null,
+                                onDelete = { viewModel.deleteNote(note.id) },
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
         item {
             OutlinedButton(onClick = onBack, modifier = Modifier.fillMaxWidth()) { Text("بازگشت") }
         }
+    }
+
+    if (showNoteDialog) {
+        NoteDialog(
+            preFiles = emptyList(),
+            preFileIds = emptyList(),
+            customers = emptyList(),
+            customerIds = emptyList(),
+            fixedPreFileId = pf.id,
+            onDismiss = { showNoteDialog = false },
+            onSave = { note ->
+                viewModel.saveNote(note) { showNoteDialog = false }
+            },
+        )
     }
 
     if (showDelete) {

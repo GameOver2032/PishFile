@@ -36,10 +36,15 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ir.pishfile.app.core.Constants
+import ir.pishfile.app.data.local.entity.CustomerEntity
+import ir.pishfile.app.data.local.entity.NoteEntity
 import ir.pishfile.app.core.Formatters
 import ir.pishfile.app.ui.AppViewModelProvider
 import ir.pishfile.app.ui.components.FollowUpDialog
 import ir.pishfile.app.ui.components.EmptyState
+import ir.pishfile.app.ui.components.FilterChipsRow
+import ir.pishfile.app.ui.components.NoteDialog
+import ir.pishfile.app.ui.components.NoteTimelineCard
 import ir.pishfile.app.ui.components.NotificationPermissionHint
 import ir.pishfile.app.ui.components.SpacerH
 import ir.pishfile.app.ui.components.StatusChip
@@ -51,15 +56,20 @@ fun FollowUpsScreen(
     openNewOnStart: Boolean,
     onOpenPreFile: (String) -> Unit,
     onOpenCustomer: (String) -> Unit,
+    initialMode: String = "FOLLOWUPS",
     viewModel: FollowUpsViewModel = viewModel(factory = AppViewModelProvider.Factory),
 ) {
     var showDone by remember { mutableStateOf(false) }
     var showAddDialog by remember { mutableStateOf(openNewOnStart) }
+    var showNoteDialog by remember { mutableStateOf(false) }
+    var mode by remember { mutableStateOf(if (initialMode == "NOTES") "NOTES" else "FOLLOWUPS") }
 
     val followUps by viewModel.followUps.collectAsStateWithLifecycle()
     val preFileRows by viewModel.preFileRows.collectAsStateWithLifecycle()
     val customers by viewModel.customers.collectAsStateWithLifecycle()
+    val notes by viewModel.notes.collectAsStateWithLifecycle()
     val customerById = customers.associateBy { it.id }
+    val fileByPreFileId = preFileRows.associateBy { it.preFile.id }
 
     LaunchedEffect(openNewOnStart) {
         if (openNewOnStart) showAddDialog = true
@@ -83,6 +93,24 @@ fun FollowUpsScreen(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
         )
 
+        FilterChipsRow(
+            options = listOf("FOLLOWUPS" to "پیگیری‌ها", "NOTES" to "مکالمات"),
+            selectedKey = mode,
+            onSelect = { newMode -> if (newMode != null) mode = newMode },
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+        )
+
+        if (mode == "NOTES") {
+            NotesTabContent(
+                notes = notes,
+                fileByPreFileId = fileByPreFileId,
+                customerById = customerById,
+                onOpenPreFile = onOpenPreFile,
+                onOpenCustomer = onOpenCustomer,
+                onAddNote = { showNoteDialog = true },
+                onDeleteNote = { viewModel.deleteNote(it) },
+            )
+        } else {
         if (followUps.isEmpty()) {
             EmptyState(
                 title = "پیگیری‌ای ثبت نشده",
@@ -157,6 +185,20 @@ fun FollowUpsScreen(
                 }
             }
         }
+        }
+    }
+
+    if (showNoteDialog) {
+        NoteDialog(
+            preFiles = preFileRows.map { "${it.preFile.draftNumber} — ${it.projectName ?: ""}" },
+            preFileIds = preFileRows.map { it.preFile.id },
+            customers = customers.map { it.name },
+            customerIds = customers.map { it.id },
+            onDismiss = { showNoteDialog = false },
+            onSave = { note ->
+                viewModel.saveNote(note) { showNoteDialog = false }
+            },
+        )
     }
 
     if (showAddDialog) {
@@ -170,5 +212,49 @@ fun FollowUpsScreen(
                 viewModel.save(followUp) { showAddDialog = false }
             },
         )
+    }
+}
+
+@Composable
+private fun NotesTabContent(
+    notes: List<NoteEntity>,
+    fileByPreFileId: Map<String, ir.pishfile.app.data.local.dao.PreFileRow>,
+    customerById: Map<String, CustomerEntity>,
+    onOpenPreFile: (String) -> Unit,
+    onOpenCustomer: (String) -> Unit,
+    onAddNote: () -> Unit,
+    onDeleteNote: (String) -> Unit,
+) {
+    if (notes.isEmpty()) {
+        EmptyState(
+            title = "مکالمه‌ای ثبت نشده",
+            subtitle = "نتیجه‌ی تماس یا جلسه با مشتری یا فروشنده را با نوت تاریخ‌دار ثبت کنید",
+            icon = { Icon(Icons.Filled.EventNote, contentDescription = null) },
+        )
+    } else {
+        LazyColumn(
+            contentPadding = PaddingValues(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            item {
+                OutlinedButton(onClick = onAddNote, modifier = Modifier.fillMaxWidth()) {
+                    Text("✍️ نوت / مکالمه جدید")
+                }
+            }
+            items(notes, key = { it.id }) { note ->
+                val file = note.preFileId?.let { fileByPreFileId[it] }
+                val customer = note.customerId?.let { customerById[it] }
+                NoteTimelineCard(
+                    note = note,
+                    contextLine = listOfNotNull(
+                        file?.let { "${it.preFile.draftNumber} — ${it.projectName ?: ""}" },
+                        customer?.let { "مشتری: ${it.name}" },
+                    ).joinToString(" • ").ifBlank { null },
+                    onOpen = note.preFileId?.let { id -> ({ onOpenPreFile(id) }) }
+                        ?: note.customerId?.let { id -> ({ onOpenCustomer(id) }) },
+                    onDelete = { onDeleteNote(note.id) },
+                )
+            }
+        }
     }
 }

@@ -66,6 +66,8 @@ object AppViewModelProvider {
                 container().preFileRepository,
                 container().unitRepository,
                 container().followUpRepository,
+                container().customerRepository,
+                container().noteRepository,
             )
         }
 
@@ -74,6 +76,7 @@ object AppViewModelProvider {
                 container().followUpRepository,
                 container().preFileRepository,
                 container().customerRepository,
+                container().noteRepository,
                 container().reminderScheduler,
             )
         }
@@ -82,6 +85,7 @@ object AppViewModelProvider {
                 container().preFileRepository,
                 container().customerRepository,
                 container().followUpRepository,
+                container().noteRepository,
                 container().reminderScheduler,
             )
         }
@@ -111,6 +115,7 @@ object AppViewModelProvider {
                 container().preFileRepository,
                 container().unitRepository,
                 container().followUpRepository,
+                container().noteRepository,
                 container().reminderScheduler,
             )
         }

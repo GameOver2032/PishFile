@@ -49,6 +49,8 @@ import ir.pishfile.app.ui.components.FilterChipsRow
 import ir.pishfile.app.ui.components.FollowUpDialog
 import ir.pishfile.app.ui.components.FormTextField
 import ir.pishfile.app.ui.components.InfoRow
+import ir.pishfile.app.ui.components.NoteDialog
+import ir.pishfile.app.ui.components.NoteTimelineCard
 import ir.pishfile.app.ui.components.SearchField
 import ir.pishfile.app.ui.components.SectionCard
 import ir.pishfile.app.ui.components.SpacerH
@@ -292,10 +294,12 @@ fun CustomerDetailScreen(
     val unit by viewModel.unit.collectAsStateWithLifecycle()
     val followUps by viewModel.followUps.collectAsStateWithLifecycle()
     val allCustomers by viewModel.allCustomers.collectAsStateWithLifecycle()
+    val notes by viewModel.notes.collectAsStateWithLifecycle()
 
     val context = LocalContext.current
     var showDelete by remember { mutableStateOf(false) }
     var showFollowUpDialog by remember { mutableStateOf(false) }
+    var showNoteDialog by remember { mutableStateOf(false) }
 
     val c = customer ?: return
 
@@ -433,9 +437,52 @@ fun CustomerDetailScreen(
             }
         }
 
+        // --- مکالمات و نوت‌های مشتری ---
+        item {
+            SectionCard(
+                title = "مکالمات و نوت‌ها",
+                subtitle = "تاریخچه‌ی پیگیری‌ها و نتیجه‌ی مکالمات با مشتری",
+                trailing = {
+                    OutlinedButton(onClick = { showNoteDialog = true }) { Text("نوت جدید") }
+                },
+            ) {
+                if (notes.isEmpty()) {
+                    Text(
+                        "مکالمه‌ای ثبت نشده — با «نوت جدید» نتیجه‌ی تماس یا جلسه را بنویسید",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        notes.forEach { note ->
+                            NoteTimelineCard(
+                                note = note,
+                                contextLine = null,
+                                onDelete = { viewModel.deleteNote(note.id) },
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
         item {
             OutlinedButton(onClick = onBack, modifier = Modifier.fillMaxWidth()) { Text("بازگشت") }
         }
+    }
+
+    if (showNoteDialog) {
+        NoteDialog(
+            preFiles = listOfNotNull(preFileRow?.let { "${it.preFile.draftNumber} — ${it.projectName ?: ""}" }),
+            preFileIds = listOfNotNull(preFileRow?.preFile?.id),
+            customers = allCustomers.map { it.name },
+            customerIds = allCustomers.map { it.id },
+            fixedCustomerId = c.id,
+            onDismiss = { showNoteDialog = false },
+            onSave = { note ->
+                viewModel.saveNote(note) { showNoteDialog = false }
+            },
+        )
     }
 
     if (showDelete) {

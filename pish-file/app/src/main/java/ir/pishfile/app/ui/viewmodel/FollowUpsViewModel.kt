@@ -7,8 +7,10 @@ import ir.pishfile.app.core.ReminderScheduler
 import ir.pishfile.app.data.local.dao.PreFileRow
 import ir.pishfile.app.data.local.entity.CustomerEntity
 import ir.pishfile.app.data.local.entity.FollowUpEntity
+import ir.pishfile.app.data.local.entity.NoteEntity
 import ir.pishfile.app.data.repository.CustomerRepository
 import ir.pishfile.app.data.repository.FollowUpRepository
+import ir.pishfile.app.data.repository.NoteRepository
 import ir.pishfile.app.data.repository.PreFileRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -21,6 +23,7 @@ class FollowUpsViewModel(
     private val repository: FollowUpRepository,
     private val preFileRepository: PreFileRepository,
     customerRepository: CustomerRepository,
+    noteRepository: NoteRepository,
     private val reminderScheduler: ReminderScheduler,
 ) : ViewModel() {
 
@@ -37,6 +40,20 @@ class FollowUpsViewModel(
 
     val customers: StateFlow<List<CustomerEntity>> = customerRepository.observeAll()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val notes: StateFlow<List<NoteEntity>> = noteRepository.observeAll()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    fun saveNote(note: NoteEntity, onSaved: () -> Unit) {
+        viewModelScope.launch {
+            noteRepository.save(note)
+            onSaved()
+        }
+    }
+
+    fun deleteNote(id: String) {
+        viewModelScope.launch { noteRepository.delete(id) }
+    }
 
     fun setShowDone(show: Boolean) { showDoneFlow.value = show }
 

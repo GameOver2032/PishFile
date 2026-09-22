@@ -214,6 +214,9 @@ fun MainScreen() {
                     onNewCustomer = { navController.navigate(Routes.quickPick("customer", allowSkip = true)) },
                     onNewFollowUp = { navController.navigate("${Routes.FOLLOWUPS}?new=1") },
                     onOpenFollowUps = { navController.navigate(Routes.FOLLOWUPS) },
+                    onOpenNotes = { navController.navigate("followups?notes=1") },
+                    onOpenPreFile = { id -> navController.navigate(Routes.preFile(id)) },
+                    onOpenCustomer = { id -> navController.navigate(Routes.customer(id)) },
                 )
             }
 
@@ -420,13 +423,17 @@ fun MainScreen() {
 
             // ---------- پیگیری‌ها و تنظیمات ----------
             composable(
-                "followups?new={new}",
-                arguments = listOf(navArgument("new") { type = NavType.StringType; defaultValue = "" }),
+                "followups?new={new}&notes={notes}",
+                arguments = listOf(
+                    navArgument("new") { type = NavType.StringType; defaultValue = "" },
+                    navArgument("notes") { type = NavType.StringType; defaultValue = "" },
+                ),
             ) { entry ->
                 FollowUpsScreen(
                     openNewOnStart = entry.arguments?.getString("new") == "1",
                     onOpenPreFile = { id -> navController.navigate(Routes.preFile(id)) },
                     onOpenCustomer = { id -> navController.navigate(Routes.customer(id)) },
+                    initialMode = if (entry.arguments?.getString("notes") == "1") "NOTES" else "FOLLOWUPS",
                 )
             }
             composable(Routes.SETTINGS) {
