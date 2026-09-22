@@ -37,12 +37,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ir.pishfile.app.core.Constants
 import ir.pishfile.app.core.Formatters
-import ir.pishfile.app.data.local.entity.FollowUpEntity
 import ir.pishfile.app.ui.AppViewModelProvider
-import ir.pishfile.app.ui.components.DropdownField
+import ir.pishfile.app.ui.components.FollowUpDialog
 import ir.pishfile.app.ui.components.EmptyState
-import ir.pishfile.app.ui.components.FormTextField
-import ir.pishfile.app.ui.components.JalaliDateField
+import ir.pishfile.app.ui.components.NotificationPermissionHint
 import ir.pishfile.app.ui.components.SpacerH
 import ir.pishfile.app.ui.components.StatusChip
 import ir.pishfile.app.ui.theme.StatusColors
@@ -52,6 +50,7 @@ import ir.pishfile.app.ui.viewmodel.FollowUpsViewModel
 fun FollowUpsScreen(
     openNewOnStart: Boolean,
     onOpenPreFile: (String) -> Unit,
+    onOpenCustomer: (String) -> Unit,
     viewModel: FollowUpsViewModel = viewModel(factory = AppViewModelProvider.Factory),
 ) {
     var showDone by remember { mutableStateOf(false) }
@@ -59,6 +58,8 @@ fun FollowUpsScreen(
 
     val followUps by viewModel.followUps.collectAsStateWithLifecycle()
     val preFileRows by viewModel.preFileRows.collectAsStateWithLifecycle()
+    val customers by viewModel.customers.collectAsStateWithLifecycle()
+    val customerById = customers.associateBy { it.id }
 
     LaunchedEffect(openNewOnStart) {
         if (openNewOnStart) showAddDialog = true
@@ -78,6 +79,10 @@ fun FollowUpsScreen(
             Text("نمایش انجام‌شده‌ها", style = MaterialTheme.typography.bodySmall)
         }
 
+        NotificationPermissionHint(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+        )
+
         if (followUps.isEmpty()) {
             EmptyState(
                 title = "پیگیری‌ای ثبت نشده",
@@ -90,6 +95,7 @@ fun FollowUpsScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 items(followUps, key = { it.id }) { followUp ->
+                    val customerName = followUp.customerId?.let { id -> customerById[id]?.name }
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -106,8 +112,11 @@ fun FollowUpsScreen(
                                     Text(
                                         listOfNotNull(
                                             followUp.dueDate?.let { Formatters.toPersianDigits(it) },
-                                            followUp.dueTime,
+                                            followUp.dueTime?.let {
+                                                if (followUp.status == Constants.FOLLOWUP_PENDING) "🔔 $it" else it
+                                            },
                                             followUp.contactPhone,
+                                            customerName?.let { "مشتری: $it" },
                                         ).joinToString(" • "),
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -154,118 +163,12 @@ fun FollowUpsScreen(
         FollowUpDialog(
             preFiles = preFileRows.map { "${it.preFile.draftNumber} — ${it.projectName ?: ""}" },
             preFileIds = preFileRows.map { it.preFile.id },
+            customers = customers.map { it.name },
+            customerIds = customers.map { it.id },
             onDismiss = { showAddDialog = false },
             onSave = { followUp ->
                 viewModel.save(followUp) { showAddDialog = false }
             },
         )
     }
-}
-
-@Composable
-private fun FollowUpDialog(
-    preFiles: List<String>,
-    preFileIds: List<String>,
-    onDismiss: () -> Unit,
-    onSave: (FollowUpEntity) -> Unit,
-) {
-    var title by remember { mutableStateOf("") }
-    var description by remember { mutableStateOf("") }
-    var type by remember { mutableStateOf("تماس") }
-    var priority by remember { mutableStateOf("معمولی") }
-    var dueDate by remember { mutableStateOf(Formatters.todayJalali()) }
-    var dueTime by remember { mutableStateOf("") }
-    var contactPhone by remember { mutableStateOf("") }
-    var preFile by remember { mutableStateOf<String?>(null) }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("پیگیری جدید") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                FormTextField(value = title, onValueChange = { title = it }, label = "موضوع *")
-                FormTextField(
-                    value = description,
-                    onValueChange = { description = it },
-                    label = "توضیحات",
-                    singleLine = false,
-                    minLines = 2,
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    DropdownField(
-                        label = "نوع",
-                        options = FollowUpsViewModel.types.map { it.second },
-                        selected = type,
-                        onSelect = { type = it },
-                        modifier = Modifier.weight(1f),
-                    )
-                    DropdownField(
-                        label = "اولویت",
-                        options = FollowUpsViewModel.priorities.map { it.second },
-                        selected = priority,
-                        onSelect = { priority = it },
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-                JalaliDateField(
-                    value = dueDate,
-                    onValueChange = { dueDate = it },
-                    label = "تاریخ پیگیری",
-                    quickMonths = emptyList(),
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FormTextField(
-                        value = dueTime,
-                        onValueChange = { dueTime = it },
-                        label = "ساعت (۱۰:۳۰)",
-                        modifier = Modifier.weight(1f),
-                    )
-                    FormTextField(
-                        value = contactPhone,
-                        onValueChange = { contactPhone = it },
-                        label = "شماره تماس",
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-                if (preFiles.isNotEmpty()) {
-                    DropdownField(
-                        label = "فایل پیش‌فروش مربوطه",
-                        options = preFiles,
-                        selected = preFile,
-                        onSelect = { preFile = it },
-                        allowEmpty = true,
-                        emptyLabel = "بدون فایل",
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = {
-                if (title.isNotBlank()) {
-                    onSave(
-                        FollowUpEntity(
-                            type = FollowUpViews.toCode(type),
-                            priority = FollowUpViews.toPriorityCode(priority),
-                            title = title.trim(),
-                            description = description.ifBlank { null },
-                            preFileId = preFile?.let { label -> preFileIds.getOrNull(preFiles.indexOf(label)) },
-                            dueDate = dueDate.ifBlank { null },
-                            dueTime = dueTime.ifBlank { null },
-                            contactPhone = contactPhone.ifBlank { null },
-                            status = Constants.FOLLOWUP_PENDING,
-                        )
-                    )
-                }
-            }) { Text("ثبت") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("انصراف") } },
-    )
-}
-
-private object FollowUpViews {
-    fun toCode(label: String): String =
-        FollowUpsViewModel.types.firstOrNull { it.second == label }?.first ?: "CALL"
-
-    fun toPriorityCode(label: String): String =
-        FollowUpsViewModel.priorities.firstOrNull { it.second == label }?.first ?: "NORMAL"
 }

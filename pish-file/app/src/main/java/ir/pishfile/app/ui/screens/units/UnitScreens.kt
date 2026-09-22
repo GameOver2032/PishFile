@@ -53,91 +53,11 @@ import ir.pishfile.app.ui.components.SectionCard
 import ir.pishfile.app.ui.components.SoftDivider
 import ir.pishfile.app.ui.components.SpacerH
 import ir.pishfile.app.ui.components.StatusChip
-import ir.pishfile.app.ui.screens.dashboard.unitStatusColor
+import ir.pishfile.app.ui.components.unitStatusColor
 import ir.pishfile.app.ui.viewmodel.UnitDetailViewModel
 import ir.pishfile.app.ui.viewmodel.UnitEditViewModel
 import ir.pishfile.app.ui.viewmodel.UnitForm
 import ir.pishfile.app.ui.viewmodel.UnitListViewModel
-
-@Composable
-fun UnitListScreen(
-    onOpen: (String) -> Unit,
-    viewModel: UnitListViewModel = viewModel(factory = AppViewModelProvider.Factory),
-) {
-    var query by remember { mutableStateOf("") }
-    var statusFilter by remember { mutableStateOf<String?>(null) }
-    var projectFilterId by remember { mutableStateOf<String?>(null) }
-    var pendingDelete by remember { mutableStateOf<UnitEntity?>(null) }
-
-    val units by viewModel.units.collectAsStateWithLifecycle()
-    val projects by viewModel.projects.collectAsStateWithLifecycle()
-
-    Column(Modifier.fillMaxSize()) {
-        SearchField(
-            query = query,
-            onQueryChange = {
-                query = it
-                viewModel.setQuery(it)
-            },
-            placeholder = "شماره واحد، بلوک، پارکینگ…",
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-        )
-
-        FilterChipsRow(
-            options = Constants.unitStatuses.map { it to Constants.unitStatusLabel(it) },
-            selectedKey = statusFilter,
-            onSelect = {
-                statusFilter = it
-                viewModel.setStatusFilter(it)
-            },
-            modifier = Modifier.padding(horizontal = 12.dp),
-        )
-
-        if (projects.size > 1) {
-            DropdownField(
-                label = "پروژه",
-                options = listOf("همه پروژه‌ها") + projects.map { it.name },
-                selected = projectFilterId?.let { id -> projects.firstOrNull { it.id == id }?.name } ?: "همه پروژه‌ها",
-                onSelect = { label ->
-                    val id = projects.firstOrNull { it.name == label }?.id
-                    projectFilterId = id
-                    viewModel.setProjectFilter(id)
-                },
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-            )
-        }
-
-        if (units.isEmpty()) {
-            EmptyState(
-                title = "واحدی یافت نشد",
-                subtitle = "واحدها را از صفحه‌ی پروژه یا با دکمه + اضافه کنید",
-                icon = { Icon(Icons.Filled.Apartment, contentDescription = null) },
-            )
-        } else {
-            LazyColumn(
-                contentPadding = PaddingValues(12.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                items(units, key = { it.id }) { unit ->
-                    UnitCard(
-                        unit = unit,
-                        onClick = { onOpen(unit.id) },
-                        onDelete = { pendingDelete = unit },
-                    )
-                }
-            }
-        }
-    }
-
-    pendingDelete?.let { unit ->
-        ConfirmDialog(
-            title = "حذف واحد",
-            message = "واحد ${unit.unitNumber} حذف شود؟",
-            onConfirm = { viewModel.delete(unit.id) },
-            onDismiss = { pendingDelete = null },
-        )
-    }
-}
 
 @Composable
 private fun UnitCard(unit: UnitEntity, onClick: () -> Unit, onDelete: () -> Unit) {

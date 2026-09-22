@@ -1,0 +1,338 @@
+package ir.pishfile.app.ui.screens.fast
+
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.collectIsPressed
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.EventNote
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import ir.pishfile.app.core.Formatters
+import ir.pishfile.app.data.local.entity.FollowUpEntity
+import ir.pishfile.app.ui.AppViewModelProvider
+import ir.pishfile.app.ui.components.NotificationPermissionHint
+import ir.pishfile.app.ui.components.SectionCard
+import ir.pishfile.app.ui.components.SpacerH
+import ir.pishfile.app.ui.theme.StatusColors
+import ir.pishfile.app.ui.viewmodel.FastViewModel
+
+/**
+ * صفحه‌ی «سریع» — خانه‌ی برنامه با طراحی بازی‌گونه:
+ * دکمه‌های بزرگ «فایل جدید» و «مشتری جدید»، آمار، اقدامات سریع و پیگیری‌های امروز.
+ */
+@Composable
+fun FastScreen(
+    onNewFile: () -> Unit,
+    onNewCustomer: () -> Unit,
+    onNewFollowUp: () -> Unit,
+    onOpenFollowUps: () -> Unit,
+    viewModel: FastViewModel = viewModel(factory = AppViewModelProvider.Factory),
+) {
+    val preFileCount by viewModel.preFileCount.collectAsStateWithLifecycle()
+    val customerCount by viewModel.customerCount.collectAsStateWithLifecycle()
+    val todayFollowUps by viewModel.todayFollowUps.collectAsStateWithLifecycle()
+
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(top = 8.dp, bottom = 24.dp),
+    ) {
+        // --- سلام و تاریخ امروز ---
+        item {
+            Column {
+                Text(
+                    "سلام! 👋",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.ExtraBold,
+                )
+                Text(
+                    "امروز ${Formatters.epochToJalaliLong(System.currentTimeMillis())}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+
+        // --- آمار (HUD) ---
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                GameStatCard(
+                    count = preFileCount,
+                    label = "فایل",
+                    icon = Icons.Filled.Description,
+                    color = StatusColors.available,
+                    modifier = Modifier.weight(1f),
+                )
+                GameStatCard(
+                    count = customerCount,
+                    label = "مشتری",
+                    icon = Icons.Filled.Person,
+                    color = StatusColors.reserved,
+                    modifier = Modifier.weight(1f),
+                )
+                GameStatCard(
+                    count = todayFollowUps.size,
+                    label = "پیگیری امروز",
+                    icon = Icons.Filled.EventNote,
+                    color = StatusColors.overdue,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+
+        // --- دکمه‌های بزرگ بازی‌گونه ---
+        item {
+            GameActionButton(
+                emoji = "📄",
+                title = "فایل جدید",
+                subtitle = "ثبت سریع یک فایل پیش‌فروش",
+                gradient = listOf(Color(0xFF1B5E20), Color(0xFF43A047)),
+                onClick = onNewFile,
+            )
+        }
+        item {
+            GameActionButton(
+                emoji = "👥",
+                title = "مشتری جدید",
+                subtitle = "ثبت مشتری / خریدار برای یک فایل",
+                gradient = listOf(Color(0xFF283593), Color(0xFF5C6BC0)),
+                onClick = onNewCustomer,
+            )
+        }
+
+        // --- اقدامات سریع ---
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                QuickActionChip("📌 پیگیری جدید", onClick = onNewFollowUp, modifier = Modifier.weight(1f))
+            }
+        }
+
+        // --- پیگیری‌های امروز ---
+        item {
+            SectionCard(
+                title = "پیگیری‌های امروز",
+                subtitle = "${Formatters.number(todayFollowUps.size)} مورد در انتظار",
+                trailing = {
+                    OutlinedButton(onClick = onOpenFollowUps) { Text("همه") }
+                },
+            ) {
+                if (todayFollowUps.isEmpty()) {
+                    Card(
+                        Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                    ) {
+                        Text(
+                            "برای امروز پیگیری ثبت نشده است 👌",
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(14.dp),
+                            textAlign = TextAlign.Center,
+                        )
+                    }
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        todayFollowUps.forEach { followUp ->
+                            FastFollowUpRow(
+                                followUp = followUp,
+                                onDone = { viewModel.completeFollowUp(followUp.id) },
+                                onOpen = onOpenFollowUps,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        item {
+            NotificationPermissionHint()
+        }
+
+        item {
+            Text(
+                "💡 برای شروع، یکی از دکمه‌های بزرگ را بزنید؛ فقط فیلدهای خالی از شما پرسیده می‌شود.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+}
+
+/** کارت آمار کوچک (سبک HUD بازی) */
+@Composable
+private fun GameStatCard(
+    count: Int,
+    label: String,
+    icon: ImageVector,
+    color: Color,
+    modifier: Modifier = Modifier,
+) {
+    Card(
+        modifier = modifier,
+        colors = CardDefaults.cardColors(containerColor = color.copy(alpha = 0.12f)),
+        shape = RoundedCornerShape(18.dp),
+    ) {
+        Column(
+            Modifier.padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(22.dp))
+            SpacerH(4)
+            Text(
+                Formatters.number(count),
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.ExtraBold,
+                color = color,
+            )
+            Text(label, style = MaterialTheme.typography.labelSmall)
+        }
+    }
+}
+
+/** دکمه‌ی بزرگ گرادیانی — حس دکمه‌ی بازی */
+@Composable
+private fun GameActionButton(
+    emoji: String,
+    title: String,
+    subtitle: String,
+    gradient: List<Color>,
+    onClick: () -> Unit,
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.interactions.collectIsPressed()
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.97f else 1f,
+        animationSpec = tween(durationMillis = 90),
+        label = "gameButtonScale",
+    )
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .scale(scale)
+            .clip(RoundedCornerShape(26.dp))
+            .background(Brush.linearGradient(gradient))
+            .pointerInput(Unit) {
+                detectTapGestures(onTap = { onClick() })
+            },
+    ) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 18.dp, vertical = 18.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(emoji, fontSize = 36.sp)
+            Spacer(Modifier.width(14.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    title,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color.White,
+                )
+                Text(
+                    subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White.copy(alpha = 0.85f),
+                )
+            }
+            Text("‹", fontSize = 30.sp, color = Color.White.copy(alpha = 0.7f), fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+/** چیپ اقدام سریع */
+@Composable
+private fun QuickActionChip(label: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    OutlinedButton(onClick = onClick, modifier = modifier) {
+        Text(label, style = MaterialTheme.typography.labelLarge)
+    }
+}
+
+/** ردیف پیگیری روز با دکمه‌ی «انجام شد» */
+@Composable
+private fun FastFollowUpRow(
+    followUp: FollowUpEntity,
+    onDone: () -> Unit,
+    onOpen: () -> Unit,
+) {
+    Card(
+        onClick = onOpen,
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
+        shape = RoundedCornerShape(14.dp),
+    ) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .padding(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    followUp.title,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    listOfNotNull(followUp.dueTime?.let { "🔔 $it" }, followUp.contactPhone)
+                        .joinToString(" • "),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            IconButton(onClick = onDone) {
+                Icon(
+                    Icons.Filled.Check,
+                    contentDescription = "انجام شد",
+                    tint = StatusColors.paid,
+                    modifier = Modifier.size(26.dp),
+                )
+            }
+        }
+    }
+}

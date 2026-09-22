@@ -55,7 +55,7 @@ import ir.pishfile.app.ui.components.SearchField
 import ir.pishfile.app.ui.components.SectionCard
 import ir.pishfile.app.ui.components.SpacerH
 import ir.pishfile.app.ui.components.StatusChip
-import ir.pishfile.app.ui.screens.dashboard.preFileStatusColor
+import ir.pishfile.app.ui.components.preFileStatusColor
 import ir.pishfile.app.ui.viewmodel.PreFileDetailViewModel
 import ir.pishfile.app.ui.viewmodel.PreFileEditViewModel
 import ir.pishfile.app.ui.viewmodel.PreFileListViewModel
@@ -610,6 +610,8 @@ fun PreFileDetailScreen(
     onBack: () -> Unit,
     onEdit: () -> Unit,
     onOpenUnit: (String) -> Unit,
+    onOpenCustomer: (String) -> Unit,
+    onNewCustomer: () -> Unit,
     viewModel: PreFileDetailViewModel = viewModel(factory = AppViewModelProvider.Factory),
 ) {
     viewModel.setPreFileId(preFileId)

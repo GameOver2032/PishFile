@@ -2,8 +2,12 @@ package ir.pishfile.app.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import ir.pishfile.app.core.Constants
+import ir.pishfile.app.core.ReminderScheduler
 import ir.pishfile.app.data.local.dao.PreFileRow
+import ir.pishfile.app.data.local.entity.CustomerEntity
 import ir.pishfile.app.data.local.entity.FollowUpEntity
+import ir.pishfile.app.data.repository.CustomerRepository
 import ir.pishfile.app.data.repository.FollowUpRepository
 import ir.pishfile.app.data.repository.PreFileRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -16,6 +20,8 @@ import kotlinx.coroutines.launch
 class FollowUpsViewModel(
     private val repository: FollowUpRepository,
     private val preFileRepository: PreFileRepository,
+    customerRepository: CustomerRepository,
+    private val reminderScheduler: ReminderScheduler,
 ) : ViewModel() {
 
     private val showDoneFlow = MutableStateFlow(false)
@@ -29,21 +35,35 @@ class FollowUpsViewModel(
     val preFileRows: StateFlow<List<PreFileRow>> = preFileRepository.observeAllRows()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    val customers: StateFlow<List<CustomerEntity>> = customerRepository.observeAll()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
     fun setShowDone(show: Boolean) { showDoneFlow.value = show }
 
     fun markDone(id: String) {
-        viewModelScope.launch { repository.markDone(id) }
+        viewModelScope.launch {
+            reminderScheduler.cancel(id)
+            repository.markDone(id)
+        }
     }
 
     fun save(followUp: FollowUpEntity, onSaved: () -> Unit) {
         viewModelScope.launch {
             repository.save(followUp)
+            if (followUp.status == Constants.FOLLOWUP_PENDING) {
+                reminderScheduler.schedule(followUp)
+            } else {
+                reminderScheduler.cancel(followUp.id)
+            }
             onSaved()
         }
     }
 
     fun delete(id: String) {
-        viewModelScope.launch { repository.delete(id) }
+        viewModelScope.launch {
+            reminderScheduler.cancel(id)
+            repository.delete(id)
+        }
     }
 
     companion object {

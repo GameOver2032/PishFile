@@ -629,7 +629,7 @@ fun ProjectDetailScreen(
                                     )
                                     StatusChip(
                                         Constants.preFileStatusLabel(row.preFile.status),
-                                        ir.pishfile.app.ui.screens.dashboard.preFileStatusColor(row.preFile.status),
+                                        ir.pishfile.app.ui.components.preFileStatusColor(row.preFile.status),
                                     )
                                 }
                                 Text(
@@ -682,7 +682,7 @@ fun ProjectDetailScreen(
                             }
                             StatusChip(
                                 Constants.unitStatusLabel(unit.status),
-                                ir.pishfile.app.ui.screens.dashboard.unitStatusColor(unit.status),
+                                ir.pishfile.app.ui.components.unitStatusColor(unit.status),
                             )
                             IconButton(onClick = { onOpenUnit(unit.id) }) {
                                 Icon(Icons.Filled.Note, contentDescription = "جزئیات")
