@@ -125,7 +125,7 @@ class CustomerEditViewModel(
 
 class CustomerListViewModel(
     private val customerRepository: CustomerRepository,
-    preFileRepository: PreFileRepository,
+    private val preFileRepository: PreFileRepository,
 ) : ViewModel() {
 
     private val queryFlow = MutableStateFlow("")

@@ -22,8 +22,8 @@ import kotlinx.coroutines.launch
 class FollowUpsViewModel(
     private val repository: FollowUpRepository,
     private val preFileRepository: PreFileRepository,
-    customerRepository: CustomerRepository,
-    noteRepository: NoteRepository,
+    private val customerRepository: CustomerRepository,
+    private val noteRepository: NoteRepository,
     private val reminderScheduler: ReminderScheduler,
 ) : ViewModel() {
 

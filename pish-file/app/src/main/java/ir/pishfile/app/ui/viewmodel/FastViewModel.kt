@@ -13,7 +13,6 @@ import ir.pishfile.app.data.repository.FollowUpRepository
 import ir.pishfile.app.data.repository.PreFileRepository
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.emptyList
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -22,9 +21,9 @@ import kotlinx.coroutines.launch
  * صفحه‌ی «سریع» (خانه‌ی برنامه): آمار کلی و پیگیری‌های امروز.
  */
 class FastViewModel(
-    preFileRepository: PreFileRepository,
-    customerRepository: CustomerRepository,
-    followUpRepository: FollowUpRepository,
+    private val preFileRepository: PreFileRepository,
+    private val customerRepository: CustomerRepository,
+    private val followUpRepository: FollowUpRepository,
     private val noteRepository: NoteRepository,
     private val reminderScheduler: ReminderScheduler,
 ) : ViewModel() {
