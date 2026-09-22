@@ -14,18 +14,19 @@
                      │ StateFlow / Flow
 ┌────────────────────▼────────────────────────┐
 │  Repository (منطق کاری)                     │
-│  PreFileRepository · ProjectRepository · …  │
+│  PreFile · Project · Unit · Customer ·      │
+│  Note · FollowUp · Settings                 │
 └────────────────────┬────────────────────────┘
                      │ suspend / Flow
 ┌────────────────────▼────────────────────────┐
-│  Room (SQLite) — ۶ جدول                     │
-│  projects · units · customers ·             │
-│  pre_files · installments · follow_ups      │
+│  Room (SQLite) — ۶ جدول · نسخه ۴          │
+│  projects · units · pre_files ·             │
+│  customers · notes · follow_ups             │
 └────────────────────┬────────────────────────┘
                      │ (فاز ۵)
 ┌────────────────────▼────────────────────────┐
-│  Sync (قرارداد آماده)                       │
-│  SyncEngine ◄── DemoSyncEngine (غیرفعال)    │
+│  Sync (قرارداد آماده در DAOها)             │
+│  soft delete + syncState + remoteId         │
 └─────────────────────────────────────────────┘
 ```
 
@@ -34,19 +35,19 @@
 | تصمیم | دلیل |
 | --- | --- |
 | **Kotlin + Jetpack Compose** | تنها زبان و فریم‌ورک رسمی و آینده‌دار اندروید؛ پشتیبانی کامل راست‌چین و فونت فارسی |
-| **Room به‌جای فایل/SharedPreferences** | کوئری‌های تجمیعی (جمع مطالبات، سررسیدها) با SQL ساده‌تر و سریع‌تر است |
+| **Room به‌جای فایل/SharedPreferences** | کوئری‌های تجمیعی (فیلتر وضعیت، جست‌وجو، شمارش‌ها) با SQL ساده‌تر و سریع‌تر است |
 | **آفلاین‌اول** | دفاتر املاک در محل پروژه یا دفتر همیشه اینترنت پایدار ندارند؛ داده باید همیشه در دسترس باشد |
-| **DI دستی** | برای شروع، بدون annotation processing و وابستگی اضافه؛ انتقال به Hilt در آینده ساده است |
+| **DI دستی** | `AppContainer`/`DefaultAppContainer` — بدون annotation processing و وابستگی اضافه؛ انتقال به Hilt در آینده ساده است |
 | **حذف نرم (Soft delete)** | هیچ داده‌ای واقعاً پاک نمی‌شود تا برای همگام‌سازی آینده قابل ارسال باشد |
+| **مهاجرت‌های واقعی (۲→۳، →۴)** | به‌روزرسانی نسخه، داده‌ی کاربر را از بین نمی‌برد |
 
 ## لایه‌ها
 
 ### ۱) لایه‌ی داده (`data/local`)
-- `PishFileDatabase` — دیتابیس Room با نسخه‌بندی و داده‌ی نمونه‌ی اولیه (فقط بار اول).
-- ۶ موجودیت با فیلدهای تخصصی املاک + سه فیلد همگام‌سازی در همه‌ی جدول‌ها:
-  `remoteId`, `syncState`, `serverUpdatedAt`.
-- DAOها هم عملیات CRUD دارند و هم کوئری‌های تجمیعی مخصوص داشبورد
-  (مثلاً `observeFinanceSummary()` و `observeOverdueAmount()`).
+- `PishFileDatabase` — دیتابیس Room (نسخه ۴) با مهاجرت‌های `MIGRATION_2_3` و `MIGRATION_3_4` و داده‌ی نمونه‌ی اولیه (فقط بار اول).
+- ۶ موجودیت با فیلدهای تخصصی املاک + فیلدهای همگام‌سازی در همه‌ی جدول‌ها:
+  `remoteId`, `syncState`, `serverUpdatedAt`, `deletedAt`.
+- DAOها هم عملیات CRUD دارند و هم کوئری‌های مشاهده‌ای (`observe*`) برای UI.
 
 ### ۲) لایه‌ی Repository (`data/repository`)
 منطق کاری این‌جاست، نه در UI:
@@ -55,54 +56,65 @@
   (امتیاز پیش‌فرض، رتبه، شرایط فروش، اقساط). `PreFileEditViewModel.applyProjectToForm()` این مقادیر را
   روی فرم می‌نهد و `PreFileWizardViewModel` ثبت فایل را قدم‌به‌قدم انجام می‌دهد: فقط فیلدهای خالی پرسیده
   می‌شوند و «قیمت کل» (= واریزی + امتیاز) همیشه به‌عنوان یک فیلد مشخص به‌روز می‌ماند.
-- `PreFileRepository` — مهم‌ترین کلاس:
-  - `nextDraftNumber()` → شماره‌ی خودکار `PF-1405-0007`
-  - `generateInstallments()` → ساخت جدول اقساط از شرایط توافق (شامل پیش‌پرداخت به‌عنوان قسط صفر)
-  - `markInstallmentPaid()` → ثبت پرداخت و به‌روزرسانی خودکار «دریافتی/مانده» قرارداد
-  - `save()` → همگام‌سازی خودکار وضعیت واحد (آزاد → رزرو → پیش‌فروش → تحویل)
-  - `markOverdueInstallments()` → شناسایی اقساط سررسیدگذشته
-- `UnitRepository.createBatch()` → ساخت گروهی واحدهای یک بلوک.
-- `BackupManager` (در `core/`) → بکاپ/بازیابی JSON و خروجی CSV.
+- **`PreFileRepository`** — شماره‌ی خودکار `PF-1405-XXXX` (`nextDraftNumber()`),
+  ذخیره‌ی فایل، و کوئری‌های JOIN (`PreFileRow` = فایل + نام پروژه + عنوان واحد).
+- **`CustomerRepository` / `NoteRepository` (نسخه ۰.۴.۰)** — مشتریان (خریدار/فروشنده) و
+  نوت‌های تاریخ‌دار؛ هر دو با حذف نرم و مشاهده‌ی `Flow` بر اساس فایل/مشتری.
+- **`UnitRepository.createBatch()`** → ساخت گروهی واحدهای یک بلوک.
+- **`BackupManager` (در `core/`)** → بکاپ/بازیابی JSON (نسخه ۴: شامل مشتریان و نوت‌ها) و خروجی CSV فایل‌ها.
 
 ### ۳) لایه‌ی UI (`ui`)
 - **فونت و راست‌چینی:** `PishFileTheme` مستقل از زبان دستگاه، کل رابط را RTL می‌کند؛ فونت وزیرمتن با چهار وزن.
-- **کامپوننت‌های فارسی:** `JalaliDateField` (تاریخ شمسی با میان‌بر)، `MoneyField` (جداکننده هزارگان + معادل میلیون)، `StatusChip`، `PaymentProgress` و…
-- **ViewModelها:** هر صفحه یک ViewModel با `StateFlow`؛ فرم‌ها به‌صورت `data class` نگه‌داری و در یک نقطه به موجودیت تبدیل می‌شوند (`ProjectForm.toEntity()` و مشابه‌ها) — همین باعث می‌شود فرم‌ها تست‌پذیر باشند.
+- **کامپوننت‌های فارسی:** `JalaliDateField` (تاریخ شمسی با میان‌بر)، `MoneyField` (جداکننده هزارگان + معادل میلیون)، `StatusChip`، `SectionCard` و…
+- **کامپوننت‌های مشترک ۰.۴.۰:**
+  - `FollowUpDialog` — دیالوگ پیگیری جدید (مشترک بین تب پیگیری‌ها و صفحه‌ی مشتری)
+  - `NoteDialog` + `NoteTimelineCard` — ثبت/نمایش مکالمات تاریخ‌دار (مشترک بین فایل، مشتری، تب پیگیری‌ها و صفحه‌ی سریع)
+  - `NotificationPermissionHint` — هشدار مجوز اعلان با درخواست یک‌ضربه‌ای
+- **ViewModelها:** هر صفحه یک ViewModel با `StateFlow`؛ فرم‌ها به‌صورت `data class` نگه‌داری و در یک نقطه به موجودیت تبدیل می‌شوند — همین باعث می‌شود فرم‌ها تست‌پذیر باشند.
+- **ناوبری:** `PishFileNavHost` — پنج تب سطح بالا: **سریع | فایل‌ها | پروژه‌ها | مشتری‌ها | پیگیری‌ها**.
+  فرایند ثبت همیشه با `QuickPickScreen` («از کجا شروع کنیم؟») شروع می‌شود: انتخاب واحد آماده/پیش‌فروشی (و برای مشتری، فایل).
+
+### ۴) آلارم یادآوری (`core/`) — ۰.۴.۰
+- **`ReminderScheduler`** — برای هر پیگیری `PENDING` با تاریخ سررسید، آلارم **دقیق یک‌بار** با
+  `AlarmManager.setExactAndAllowWhileIdle` (در اندروید ۱۲+ اگر مجوز دقیق داده نشده باشد، `set` تقریبی).
+  زمان زنگ از تاریخ شمسی `dueDate` + ساعت `dueTime` (پیش‌فرض ۰۹:۰۰) محاسبه می‌شود
+  (تست واحد: `ReminderSchedulerTest`).
+- **`ReminderReceiver`** — در لحظه‌ی آلارم، پیگیری را از دیتابیس می‌خواند (فقط `PENDING` اعلان می‌گیرد)
+  و اعلان در کانال «یادآوری پیگیری‌ها» نشان می‌دهد؛ با باز کردن اعلان، برنامه باز می‌شود.
+- لغو آلارم در `save` (غیر-PENDING) / `markDone` / `delete` — از طریق همان `requestCode` (hash شناسه).
 
 ## تاریخ شمسی
 
 هیچ کتابخانه‌ی خارجی استفاده نشده. تبدیل در `core/Formatters.kt` انجام می‌شود:
 
 - `gregorianToJalali` / `jalaliToGregorian` — الگوریتم چرخه‌ی ۳۳ ساله
-- `addJalaliMonths` / `addJalaliDays` — برای ساخت سررسید اقساط
-- `epochToJalali` / `jalaliStringToEpoch` — مرتب‌سازی و یادآوری
+- `addJalaliMonths` / `addJalaliDays` — برای سررسید اقساط و تاریخ نوت‌ها
+- `epochToJalali` / `jalaliStringToEpoch` — مرتب‌سازی، «X روز دیگر» و محاسبه‌ی زمان آلارم
 
 تاریخ‌ها به شکل **`YYYY/MM/DD` با رقم لاتین و صفر ابتدایی** ذخیره می‌شوند (مثل `1405/06/29`) تا مقایسه و مرتب‌سازی رشته‌ای درست کار کند، و فقط در نمایش به رقم فارسی تبدیل می‌شوند.
 
 ## آماده‌سازی برای سرور (فاز ۵)
 
-همه‌ی رکوردها سه میدان همگام‌سازی دارند و DAOها متدهای زیر را ارائه می‌دهند:
+همه‌ی رکوردها فیلدهای همگام‌سازی دارند و DAOها حذف نرم با `syncState` ارائه می‌دهند:
 
 ```kotlin
-suspend fun getPendingSync(): List<T>
-suspend fun getChangedSince(since: Long): List<T>
-suspend fun updateSyncState(id: String, state: String, remoteId: String?)
-suspend fun softDelete(id: String, timestamp: Long)
+suspend fun softDelete(id: String, timestamp: Long)   // syncState = PENDING_DELETE
 ```
 
 برای اتصال سرور:
 
-1. یک کلاس `HttpSyncEngine : SyncEngine` بسازید (Retrofit/Ktor + احراز هویت).
-2. در `DefaultAppContainer` آن را جای `DemoSyncEngine` بگذارید.
+1. یک `HttpSyncEngine` بسازید (Retrofit/Ktor + احراز هویت).
+2. در `DefaultAppContainer` به ظرف اضافه کنید.
 3. آدرس سرور را از `SettingsRepository.serverUrl` بخوانید.
-4. در `SyncRepository.markPushedIfSynced()` وضعیت رکوردهای ارسال‌شده را `CLEAN` کنید.
+4. رکوردهای `PENDING_UPLOAD` را بفرستید و `remoteId`/`syncState` را به‌روز کنید.
 
 هیچ صفحه یا ViewModelی نیاز به تغییر ندارد.
 
 ## تصمیم‌های آگاهانه (و بدهی فنی)
 
-- `fallbackToDestructiveMigrationOnDowngrade()` فقط برای راحتی توسعه است؛ **قبل از انتشار نسخه‌ی نهایی** باید مهاجرت‌های واقعی نوشته شود.
-- `PreFileRepository.refreshPreFilePaidAmount()` با جمع ساده‌ی اقساط کار می‌کند؛ اگر پرداخت‌های خارج از قسط اضافه شود، باید با پرداخت‌های مستقیم (`addPayment`) ترکیب شود.
-- بارگذاری تصاویر اسناد (فاز ۴) هنوز پیاده نشده؛ فیلد `documentPaths` رزرو شده است.
+- `fallbackToDestructiveMigration()` فقط برای **downgrade** (که در استفاده‌ی عادی رخ نمی‌دهد) باقی مانده است؛ برای به‌روزرسانی عادی مهاجرت‌های واقعی ۲→۳ و →۴ نوشته شده‌اند.
+- **آلارم‌ها روی گوشی:** اگر کاربر مجوز اعلان یا آلارم دقیق را بدهد، آلارم دقیق می‌شود؛ وگرنه تقریبی (نزدیک زمان سررسید).
+- مشتری هنوز «فایل‌های متعدد» ندارد (یک `preFileId`/`unitId`)؛ اگر لازم شد، جدول پیوند `customer_pre_files` اضافه می‌شود.
+- بارگذاری تصاویر اسناد (فاز ۴) هنوز پیاده نشده؛ فیلدها رزرو شده‌اند.
 
 </div>

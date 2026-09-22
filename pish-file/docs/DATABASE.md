@@ -2,141 +2,164 @@
 
 # مدل داده — فیلدهای تخصصی پیش‌فروش املاک
 
-دیتابیس: SQLite با Room — نام فایل: `pishfile.db` (نسخه ۳).
+دیتابیس: SQLite با Room — نام فایل: `pishfile.db` (**نسخه ۴**).
 
-> **مهاجرت ۲ به ۳:** جدول `projects` با `ALTER TABLE … ADD COLUMN` به‌روزرسانی شده است (مهاجرت واقعی در `PishFileDatabase.MIGRATION_2_3`)؛ یعنی **داده‌های کاربر هنگام به‌روزرسانی حفظ می‌شود** و نیازی به بکاپ و نصب مجدد نیست.
-همه‌ی تاریخ‌ها **شمسی** و با قالب `YYYY/MM/DD` و رقم لاتین ذخیره می‌شوند (مثال: `1405/06/29`) و به تومان هستند.
+> **مهاجرت‌ها:**
+> - **۲ → ۳** (`MIGRATION_2_3`): افزودن «پیش‌فرض‌های ثبت فایل» به `projects` با `ALTER TABLE … ADD COLUMN`
+> - **۳ → ۴** (`MIGRATION_3_4`): ایجاد جدول‌های `customers` و `notes` + افزودن ستون `customerId` به `follow_ups`
+>
+> همه‌ی مهاجرت‌ها **واقعی (غیرمخرب)** هستند؛ یعنی **داده‌های کاربر هنگام به‌روزرسانی حفظ می‌شود** و نیازی به بکاپ و نصب مجدد نیست.
+
+همه‌ی تاریخ‌ها **شمسی** و با قالب `YYYY/MM/DD` و رقم لاتین ذخیره می‌شوند (مثال: `1405/06/29`). مبالغ به **تومان** هستند.
 
 ## فهرست جدول‌ها
 
 | جدول | کلاس | کاربرد |
 | --- | --- | --- |
-| `projects` | `ProjectEntity` | پروژه‌ی ساختمانی |
+| `projects` | `ProjectEntity` | پروژه‌ی ساختمانی (با پیش‌فرض‌های ثبت فایل) |
 | `units` | `UnitEntity` | واحد (آپارتمان/مغازه/اداری/پارکینگ/انباری/ویلا/زمین) |
-| `customers` | `CustomerEntity` | مشتری حقیقی/حقوقی |
-| `pre_files` | `PreFileEntity` | برگه‌ی پیش‌فایل (قرارداد پیش‌فروش) |
-| `installments` | `InstallmentEntity` | اقساط و سررسیدها |
-| `follow_ups` | `FollowUpEntity` | پیگیری‌ها |
+| `pre_files` | `PreFileEntity` | فایل پیش‌فروش (قرارداد پیش‌فروش یک واحد) |
+| `customers` | `CustomerEntity` | مشتری / طرف‌مذاکره (خریدار/فروشنده) — ۰.۴.۰ |
+| `notes` | `NoteEntity` | نوت/مکالمه‌ی تاریخ‌دار — ۰.۴.۰ |
+| `follow_ups` | `FollowUpEntity` | پیگیری‌ها (با آلارم) |
 
 ## رابطه‌ها
 
 ```
-projects ──▲── units ──▲── pre_files ──▲── installments
-                                    └── follow_ups
-customers ─────────────────────────────┘
+projects ──▲── units ──▲── pre_files ──▲── notes
+                  └───┴───────────────┴──────────┘
+customers ──▲ (preFileId/unitId، SET NULL)   │ (preFileId, CASCADE)
+            └── follow_ups (customerId)      └── follow_ups (preFileId, CASCADE)
 ```
 
-- حذف پروژه ⇒ حذف واحدها و پیش‌فایل‌ها و اقساط (CASCADE)
-- حذف واحد ⇒ پیش‌فایل باقی می‌ماند (`unitId` تهی می‌شود) چون **اسنپ‌شات** واحد در پیش‌فایل ذخیره شده است
-- حذف مشتری ⇒ پیش‌فایل‌های او هم حذف می‌شوند (CASCADE)
+- حذف پروژه ⇒ حذف واحدها و فایل‌ها (CASCADE)
+- حذف واحد ⇒ فایل باقی می‌ماند (`unitId` تهی می‌شود) چون **اسنپ‌شات** واحد در فایل ذخیره شده است
+- حذف فایل ⇒ نوت‌ها و پیگیری‌های آن حذف می‌شوند (CASCADE) ولی **مشتری‌ها می‌مانند** (`preFileId` تهی می‌شود)
+- حذف مشتری ⇒ نوت‌هایش حذف می‌شوند (CASCADE)؛ پیوندش روی فایل/واحد قطع می‌شود
 
 ## جدول `projects` (پروژه)
 
 | گروه | فیلدها |
 | --- | --- |
-| شناسه | `id`, `name`, `code`, `projectType` |
+| شناسه | `id`, `name`, `code`, `projectType`, `pricingModel` |
 | موقعیت | `province`, `city`, `district`, `address`, `postalCode`, `latitude`, `longitude` |
 | فنی | `landArea`, `totalBuiltArea`, `blockCount`, `floorCount`, `unitCount`, `unitsPerFloor`, `parkingCount`, `elevatorCount`, `structureType`, `heatingSystem` |
 | مجوز | `permitNumber`, `permitIssueDate`, `permitExpiryDate`, `landDeedNumber` |
 | مالی | `costPerMeter`, `salePricePerMeter`, `defaultDepositAmount`, `shareMeterArea`, `sharePrice`, `totalBudget` |
-| **پیش‌فرض‌های ثبت فایل** | `defaultBonusAmount`, `hasRanking`, `defaultRanking`, `saleConditionCash/Installment/Exchange`, `saleConditionNotes`, `installmentCount`, `remainingInstallmentsCount`, `installmentAmount`, `installmentPeriod`, `nextInstallmentDueDate` |
+| **پیش‌فرض‌های ثبت فایل** (۰.۳.۰) | `defaultBonusAmount`, `hasRanking`, `defaultRanking`, `saleConditionCash/Installment/Exchange`, `saleConditionNotes`, `installmentCount`, `remainingInstallmentsCount`, `installmentAmount`, `installmentPeriod`, `nextInstallmentDueDate` |
 | پیشرفت | `phase`, `progressPercent`, `startDate`, `deliveryDate`, `deliveryFrom` |
-| افراد | `contractorName/Phone`, `supervisorName/Phone`, `developerName`, `salesManagerPhone` |
+| افراد/مالی | `contractorName/Phone`, `supervisorName/Phone`, `developerName`, `salesManagerPhone`, `iban`, `bankName` |
 | سایر | `facilities`, `description`, `tags`, `isFavorite`, `isArchived` |
 
-مراحل پروژه (`phase`): `PLANNING`، `EXCAVATION`، `STRUCTURE`، `FINISHING`، `DELIVERED`.
+`pricingModel`: `METER` (متری) / `DEPOSIT_BONUS` (واریزی و امتیاز) / `SHARE` (سهامی).
+`phase`: `PLANNING`، `EXCAVATION`، `STRUCTURE`، `FINISHING`، `DELIVERED`.
 
-> **پیش‌فرض‌های ثبت فایل (نسخه ۰.۳.۰):** این فیلدها همه‌ی مقادیری هستند که قبلاً برای **هر فایل** جداگانه پر می‌شد و در واحدهای یک پروژه با هم یکسان‌اند
-> (واریزی تا امروز، امتیاز، رتبه، شرایط فروش، اقساط). حالا یک‌بار روی پروژه ثبت می‌شوند و در «ثبت سریع فایل»
-> خودکار پر می‌شوند؛ برنامه فقط فیلدهای خالی (مثلاً نام مالک، امتیاز خاصِ آن فایل و رتبه) را می‌پرسد.
-> **قیمت کل** هر فایل همیشه `واریزی + امتیاز` (یا معادل آن در مدل‌های متری/سهامی) است و با همین عنوان در همه‌ی نماها نمایش داده می‌شود.
+> **پیش‌فرض‌های ثبت فایل:** این فیلدها همه‌ی مقادیری هستند که در واحدهای یک پروژه با هم یکسان‌اند
+> (واریزی تا امروز، امتیاز، رتبه، شرایط فروش، اقساط). یک‌بار روی پروژه ثبت می‌شوند و در
+> «ثبت سریع فایل» خودکار پر می‌شوند. **قیمت کل** هر فایل همیشه `واریزی + امتیاز`
+> (یا معادل آن در مدل‌های متری/سهامی) است و با همین عنوان در همه‌ی نماها نمایش داده می‌شود.
 
 ## جدول `units` (واحد)
 
 | گروه | فیلدها |
 | --- | --- |
-| شناسه | `block`, `unitNumber`, `floor`, `unitType`, `bedrooms`, `bathrooms`, `kitchens` |
+| شناسه | `projectId`, `block`, `unitNumber`, `floor`, `unitType`, `bedrooms`, `bathrooms`, `kitchens` |
 | متراژ | `grossArea`, `netArea`, `balconyArea`, `commonAreaShare`, `ceilingHeight` |
 | نور و موقعیت | `direction`, `lighting`, `view`, `positionType` |
-| ضمائم | `parkingCount`, `parkingNumber`, `storageCount`, `storageNumber`, `facilities` |
-| مالی | `pricePerMeter`, `totalPrice`, `finalPrice`, `extraCosts`, `discount`, `vatAmount`, `costPrice` |
-| پیشنهاد پرداخت | `prepaymentSuggestion`, `suggestedInstallment`, `suggestedInstallmentCount` |
-| وضعیت | `status`, `deliveryDate`, `deliveryStatus`, `technicalNotes` |
+| ضمیمه‌ها | `facilities`, `parkingCount/Number`, `storageCount/Number` |
+| مالی | `pricePerMeter`, `totalPrice`, `finalPrice`, `extraCosts`, `discount`, `vatAmount`, `prepaymentSuggestion`, `suggestedInstallment(Count)`, `costPrice` |
+| وضعیت | `status`, `deliveryDate`, `deliveryStatus`, `technicalNotes`, `description` |
+| فایل‌ها | `floorPlanPath`, `photoPaths` |
 
-وضعیت واحد (`status`): `AVAILABLE` (آزاد)، `RESERVED` (رزرو)، `SOLD` (پیش‌فروش‌شده)، `DELIVERED` (تحویل‌شده).
+`status`: `AVAILABLE` (آزاد) / `RESERVED` (رزرو/پیش‌فروشی) / `SOLD` / `DELIVERED`.
+`displayTitle` (محاسباتی): «بلوک A — واحد 502 — طبقه ۵».
 
-> **محاسبه‌ی خودکار:** اگر «قیمت کل» خالی بماند، `grossArea × pricePerMeter` محاسبه می‌شود.
-
-## جدول `customers` (مشتری)
-
-| گروه | فیلدها |
-| --- | --- |
-| هویت | `title`, `firstName`, `lastName`, `fatherName`, `nationalId`, `idNumber`, `birthDate`, `entityType` |
-| حقوقی | `companyName`, `registrationNumber`, `economicCode` |
-| تماس | `phonePrimary`, `phoneSecondary`, `whatsapp`, `email` |
-| نشانی | `province`, `city`, `address`, `postalCode`, `job`, `workAddress`, `workPhone` |
-| بانکی | `iban`, `bankName` |
-| اعتبار | `status`, `source`, `referredBy`, `creditScore`, `creditLimit`, `hasBouncedCheque`, `isReturningCustomer`, `totalPurchases` |
-
-وضعیت مشتری (`status`): `LEAD` (سرنخ)، `ACTIVE`، `INSTALLMENT` (در حال پرداخت اقساط)، `SETTLED` (تسویه)، `INACTIVE`.
-
-منبع آشنایی (`source`): `REFERRAL`, `INSTAGRAM`, `SITE`, `BANNER`, `EXHIBITION`, `WALK_IN`, `CALL`, `OTHER`.
-
-## جدول `pre_files` (پیش‌فایل) — قلب برنامه
+## جدول `pre_files` (فایل پیش‌فروش)
 
 | گروه | فیلدها |
 | --- | --- |
-| شناسه | `draftNumber` (خودکار `PF-سال-شماره`)، `draftDate`, `trackingCode` |
-| طرفین | `projectId`, `unitId`, `customerId`, `salesAgentName`, `salesAgentPhone` |
-| اسنپ‌شات واحد | `unitBlock`, `unitNumber`, `unitFloor`, `unitArea` |
-| مالی | `totalPrice`, `pricePerMeter`, `discount`, `finalPrice`, `prepayment`, `paidAmount`, `remainingAmount` |
-| قسط‌بندی | `installmentCount`, `installmentAmount`, `installmentPeriod`, `installmentStartDate`, `paymentType` |
-| تعهدات | `sellerCommitment`, `buyerCommitment`, `penaltyClause`, `cancellationTerms` |
-| سند و تحویل | `deedDate`, `deedOffice`, `deliveryDate`, `isUnitMortgaged` |
-| ضمانت | `guaranteeType`, `chequeCount`, `chequeAmount` |
-| وضعیت | `status`, `confirmedDate`, `cancelDate`, `cancelReason`, `cancelPenaltyAmount` |
-| سایر | `exchangeDetails`, `notes`, `documentPaths`, `contractPhotoPath` |
+| شناسه | `draftNumber` (`PF-1405-0001`), `draftDate` |
+| اتصال | `projectId` (CASCADE), `unitId` (SET NULL) |
+| مالک | `ownerName`, `ownerPhone` |
+| قیمت | `pricingModel`, `depositAmount`, `bonusAmount`, `pricePerMeter`, `meterArea`, `shareMeterArea`, `shareCount`, `sharePrice`, `totalPrice` (نهایی) |
+| رتبه | `hasRanking`, `ranking` |
+| شرایط فروش | `saleConditionCash/Installment/Exchange`, `saleConditionNotes` |
+| اقساط | `installmentCount`, `remainingInstallmentsCount`, `installmentAmount`, `installmentPeriod`, `nextInstallmentDueDate` |
+| اسنپ‌شات واحد | `unitBlock`, `unitNumber`, `unitFloor` |
+| وضعیت | `status`, `deliveryDate`, `notes`, `isFavorite` |
 
-وضعیت پیش‌فایل (`status`): `DRAFT` (پیش‌نویس)، `RESERVED` (رزرو اولیه)، `PENDING_PAYMENT` (در انتظار پرداخت)، `CONFIRMED` (قطعی)، `COMPLETED` (تسویه/تحویل)، `CANCELED` (لغو).
+`status`: `DRAFT` (پیش‌نویس) / `URGENT` (فروش فوری) / `NORMAL` (غیر فوری) / `WITHDRAWN` (منصرف).
 
-نوع پرداخت (`paymentType`): `CASH`, `INSTALLMENT`, `EXCHANGE` (تهاتر), `FACILITY` (تسهیلات), `MIXED`.
+مقادیر محاسباتی (در کلاس، ذخیره نمی‌شوند):
+- `computedTotal`: مجموع بر اساس مدل (واریزی + امتیاز / سهام × قیمت / متر × متری)
+- `displayPrice`: `totalPrice` اگر پر شده باشد، وگرنه `computedTotal` — این همان **«قیمت کل»** است
+- `saleConditionsSummary`: «نقد، شرایطی، تهاتر»
 
-**فیلدهای محاسبه‌شده در کد (نه در دیتابیس):**
-- `effectivePrice = finalPrice ?: (totalPrice - discount)`
-- `dueAmount = effectivePrice - paidAmount`
-- `progressPercent = paidAmount / effectivePrice × 100`
+## جدول `customers` (مشتری) — ۰.۴.۰
 
-## جدول `installments` (اقساط)
+| فیلدها | توضیح |
+| --- | --- |
+| `name` * | نام و نام خانوادگی |
+| `phone` | شماره تماس (برای دکمه‌ی تماس) |
+| `role` | `BUYER` (خریدار) / `SELLER` (فروشنده) / `OTHER` |
+| `preFileId` | فایل مرتبط (SET NULL — حذف فایل، مشتری را نمی‌رود) |
+| `unitId` | واحد مرتبط (SET NULL) |
+| `notes` | یادداشت کلی |
+| `status` | `ACTIVE` (در مذاکره) / `DONE` (نهایی شد) / `LOST` (رد شد) |
 
-`installmentNumber` (۰ = پیش‌پرداخت)، `title`، `amount`، `dueDate`، `status`، `paidAmount`، `paidDate`، `paymentMethod`، `referenceNumber`، `bankName`، `chequeOwner`، `chequeDate`، `latePenalty`، `reminderEnabled`، `reminderDate`.
+## جدول `notes` (نوت/مکالمه) — ۰.۴.۰
 
-وضعیت قسط (`status`): `UNPAID`, `PAID`, `PARTIAL` (پرداخت جزئی), `OVERDUE` (معوق).
+| فیلدها | توضیح |
+| --- | --- |
+| `preFileId` | فایل مرتبط (CASCADE) |
+| `customerId` | مشتری مرتبط (CASCADE) |
+| `type` | `CALL` (تلفنی) / `VISIT` (حضوری) / `MESSAGE` (پیامکی) / `OTHER` |
+| `text` * | شرح مکالمه / پیگیری |
+| `outcome` | نتیجه مکالمه |
+| `noteDate` | تاریخ شمسی (پیش‌فرض امروز) |
 
-**ساخت خودکار:** با ذخیره‌ی پیش‌فایل، برای هر قسط ردیفی ساخته می‌شود:
-`dueDate = installmentStartDate + (period × (i-1))` که `period` بر اساس «ماهانه/دو ماهه/فصلی/شش‌ماهه/سالانه» یک، دو، سه، شش یا دوازده ماه است.
+نوت می‌تواند فقط به فایل، فقط به مشتری، به هر دو، یا بدون پیوند باشد.
+تایم‌لاین‌ها روی صفحه‌ی فایل/مشتری و مرور کلی در تب پیگیری‌ها (حالت «مکالمات») نمایش داده می‌شوند.
 
 ## جدول `follow_ups` (پیگیری)
 
-`type` (`CALL`/`VISIT`/`MEETING`/`MESSAGE`/`REMINDER`)، `priority` (`LOW`/`NORMAL`/`HIGH`/`URGENT`)، `title`، `description`، `outcome`، `result`، `customerId`، `preFileId`، `projectId`، `dueDate`، `dueTime`، `durationMinutes`، `status`، `completedDate`، `assignee`، `contactPhone`، `remindDaysBefore`.
-
-## فیلدهای همگام‌سازی (در همه‌ی جدول‌ها)
-
-| فیلد | معنا |
+| فیلدها | توضیح |
 | --- | --- |
-| `remoteId` | شناسه‌ی رکورد روی سرور (خالی تا قبل از اولین ارسال) |
-| `syncState` | `CLEAN` / `PENDING_UPLOAD` / `PENDING_DELETE` / `CONFLICT` |
-| `serverUpdatedAt` | زمان آخرین تغییر روی سرور (برای حل تعارض) |
-| `deletedAt` | حذف نرم — رکورد از فهرست‌ها پنهان می‌شود ولی برای ارسال باقی می‌ماند |
+| `type` | `CALL` / `VISIT` / `MEETING` / `OTHER` |
+| `priority` | `LOW` / `NORMAL` / `HIGH` |
+| `title` * | موضوع |
+| `description` | شرح |
+| `outcome` / `result` | نتیجه (پس از انجام) |
+| `preFileId` | فایل مرتبط (CASCADE) |
+| `projectId` | پروژه (اطلاعاتی) |
+| `customerId` | **مشتری مرتبط — ۰.۴.۰** |
+| `dueDate` / `dueTime` | سررسید شمسی + ساعت → **آلارم** |
+| `status` | `PENDING` / `DONE` / `CANCELED` |
+| `completedDate` | تاریخ انجام |
+| `assignee` | مسئول |
+| `contactPhone` | شماره تماس |
+| `remindDaysBefore` | رزرو برای آینده |
+
+### آلارم یادآوری (۰.۴.۰)
+
+`ReminderScheduler` برای هر پیگیری `PENDING` که `dueDate` معتبر داشته باشد، یک آلارم
+**دقیق یک‌بار** (`AlarmManager.setExactAndAllowWhileIdle`) روی تاریخ/ساعت شمسی سررسید ثبت می‌کند؛
+`ReminderReceiver` در آن لحظه اعلان نشان می‌دهد (کانال «یادآوری پیگیری‌ها»).
+اگر ساعتی نده شده باشد، ساعت ۰۹:۰۰ فرض می‌شود.
+با `markDone` / `delete` / `save(غير-PENDING)` آلارم لغو می‌شود.
+در اندروید ۱۲+ اگر مجوز آلارم دقیق داده نشده باشد، آلارم تقریبی (`set`) تنظیم می‌شود؛
+در اندروید ۱۳+ مجوز `POST_NOTIFICATIONS` لازم است (هشدار + دکمه‌ی فعال‌سازی در UI).
+
+## فیلدهای همگام‌سازی (همه‌ی جدول‌ها)
+
+`remoteId`, `syncState`, `serverUpdatedAt`, `deletedAt` — رزرو برای فاز همگام‌سازی.
+حذف در همه‌ی جدول‌ها **نرم** است (`deletedAt`) و از جداول وابسته با CASCADE واقعی حذف می‌شود.
 
 ## فیلدهایی که ممکن است بخواهید اضافه کنید
 
-اگر کار شما این موارد را لازم دارد، اضافه‌کردنشان ساده است (یک فیلد در موجودیت + یک فیلد در فرم + نمایش):
-
-- شماره پایان‌کار/گواهی عدم خلاف
-- کد رهگیری کاداستر و پلاک ثبتی
-- سهم‌الارض / تعداد دانگ
-- متره‌ی دقیق: تعداد پریز، کولر گازی، رادیاتور
-- فهرست کامل ساکنان و تحویل کلید
-- کمیسیون مشاور و سهم مشارکت
+- **تاریخ آخرین تماس با مشتری** → روی `customers` یک `lastContactDate`
+- **منبع مشتری** (اطلاعاتی/اینستاگرام/آغاز دهان) → `customers.source`
+- **تسویه‌ی حساب** → جدول `payments` با `preFileId`
+- اضافه‌کردن هر فیلد: موجودیت → `ALTER TABLE` در مهاجرت جدید → فرم → نمایش → بکاپ JSON.
 
 </div>
