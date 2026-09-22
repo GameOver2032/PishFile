@@ -102,6 +102,48 @@ object Constants {
     // ---------- جهت واحد ----------
     val unitDirections = listOf("شمالی", "جنوبی", "شرقی", "غربی", "شمالی-جنوبی", "شرقی-غربی")
 
+    // ---------- مشتری (خریدار / طرف‌مذاکره) ----------
+    const val CUSTOMER_ROLE_BUYER = "BUYER"
+    const val CUSTOMER_ROLE_SELLER = "SELLER"
+    const val CUSTOMER_ROLE_OTHER = "OTHER"
+
+    val customerRoles = listOf(CUSTOMER_ROLE_BUYER, CUSTOMER_ROLE_SELLER, CUSTOMER_ROLE_OTHER)
+
+    fun customerRoleLabel(role: String?): String = when (role) {
+        CUSTOMER_ROLE_BUYER -> "خریدار"
+        CUSTOMER_ROLE_SELLER -> "فروشنده"
+        CUSTOMER_ROLE_OTHER -> "سایر"
+        else -> "خریدار"
+    }
+
+    const val CUSTOMER_ACTIVE = "ACTIVE"       // در مذاکره
+    const val CUSTOMER_DONE = "DONE"           // نهایی شد
+    const val CUSTOMER_LOST = "LOST"           // رد شد
+
+    val customerStatuses = listOf(CUSTOMER_ACTIVE, CUSTOMER_DONE, CUSTOMER_LOST)
+
+    fun customerStatusLabel(status: String?): String = when (status) {
+        CUSTOMER_ACTIVE -> "در مذاکره"
+        CUSTOMER_DONE -> "نهایی شد"
+        CUSTOMER_LOST -> "رد شد"
+        else -> "در مذاکره"
+    }
+
+    // ---------- نوت / مکالمه ----------
+    const val NOTE_CALL = "CALL"
+    const val NOTE_VISIT = "VISIT"
+    const val NOTE_MESSAGE = "MESSAGE"
+    const val NOTE_OTHER = "OTHER"
+
+    val noteTypes = listOf(NOTE_CALL, NOTE_VISIT, NOTE_MESSAGE, NOTE_OTHER)
+
+    fun noteTypeLabel(type: String?): String = when (type) {
+        NOTE_CALL -> "تلفنی"
+        NOTE_VISIT -> "حضوری"
+        NOTE_MESSAGE -> "پیامکی"
+        else -> "سایر"
+    }
+
     // ---------- وضعیت پیگیری ----------
     const val FOLLOWUP_PENDING = "PENDING"
     const val FOLLOWUP_DONE = "DONE"

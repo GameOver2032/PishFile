@@ -5,7 +5,9 @@ import android.content.Intent
 import android.net.Uri
 import androidx.core.content.FileProvider
 import ir.pishfile.app.data.local.PishFileDatabase
+import ir.pishfile.app.data.local.entity.CustomerEntity
 import ir.pishfile.app.data.local.entity.FollowUpEntity
+import ir.pishfile.app.data.local.entity.NoteEntity
 import ir.pishfile.app.data.local.entity.PreFileEntity
 import ir.pishfile.app.data.local.entity.ProjectEntity
 import ir.pishfile.app.data.local.entity.UnitEntity
@@ -28,13 +30,15 @@ class BackupManager(
     suspend fun exportFullBackup(): File {
         val root = JSONObject()
         root.put("app", "PishFile")
-        root.put("version", 3)
+        root.put("version", 4)
         root.put("exportedAt", System.currentTimeMillis())
 
         root.put("projects", JSONArray(database.projectDao().getAll().map { projectToJson(it) }))
         root.put("units", JSONArray(database.unitDao().getAll().map { unitToJson(it) }))
         root.put("preFiles", JSONArray(database.preFileDao().getAll().map { preFileToJson(it) }))
         root.put("followUps", JSONArray(database.followUpDao().getAll().map { followUpToJson(it) }))
+        root.put("customers", JSONArray(database.customerDao().getAll().map { customerToJson(it) }))
+        root.put("notes", JSONArray(database.noteDao().getAll().map { noteToJson(it) }))
 
         val file = File(exportDir(), "pishfile-backup-${timestamp()}.json")
         file.writeText(root.toString(2), Charsets.UTF_8)
@@ -99,6 +103,8 @@ class BackupManager(
         var units = 0
         var preFiles = 0
         var followUps = 0
+        var customers = 0
+        var notes = 0
 
         root.optJSONArray("projects")?.let { array ->
             for (i in 0 until array.length()) {
@@ -124,8 +130,20 @@ class BackupManager(
                 followUps++
             }
         }
+        root.optJSONArray("customers")?.let { array ->
+            for (i in 0 until array.length()) {
+                database.customerDao().insert(jsonToCustomer(array.getJSONObject(i)))
+                customers++
+            }
+        }
+        root.optJSONArray("notes")?.let { array ->
+            for (i in 0 until array.length()) {
+                database.noteDao().insert(jsonToNote(array.getJSONObject(i)))
+                notes++
+            }
+        }
 
-        return ImportSummary(projects, units, preFiles, followUps)
+        return ImportSummary(projects, units, preFiles, followUps, customers, notes)
     }
 
     data class ImportSummary(
@@ -133,8 +151,10 @@ class BackupManager(
         val units: Int,
         val preFiles: Int,
         val followUps: Int,
+        val customers: Int,
+        val notes: Int,
     ) {
-        val total: Int get() = projects + units + preFiles + followUps
+        val total: Int get() = projects + units + preFiles + followUps + customers + notes
     }
 
     fun shareFile(file: File, mimeType: String = "application/octet-stream"): Intent {
@@ -208,8 +228,22 @@ class BackupManager(
         put("title", f.title); put("description", f.description); put("outcome", f.outcome)
         put("preFileId", f.preFileId); put("projectId", f.projectId)
         put("dueDate", f.dueDate); put("dueTime", f.dueTime); put("status", f.status)
-        put("contactPhone", f.contactPhone)
+        put("contactPhone", f.contactPhone); put("customerId", f.customerId)
         put("createdAt", f.createdAt); put("updatedAt", f.updatedAt)
+    }
+
+    private fun customerToJson(c: CustomerEntity) = JSONObject().apply {
+        put("id", c.id); put("name", c.name); put("phone", c.phone)
+        put("role", c.role); put("preFileId", c.preFileId); put("unitId", c.unitId)
+        put("notes", c.notes); put("status", c.status)
+        put("createdAt", c.createdAt); put("updatedAt", c.updatedAt)
+    }
+
+    private fun noteToJson(n: NoteEntity) = JSONObject().apply {
+        put("id", n.id); put("preFileId", n.preFileId); put("customerId", n.customerId)
+        put("type", n.type); put("text", n.text); put("outcome", n.outcome)
+        put("noteDate", n.noteDate)
+        put("createdAt", n.createdAt); put("updatedAt", n.updatedAt)
     }
 
     private fun JSONObject.text(key: String): String? =
@@ -319,6 +353,32 @@ class BackupManager(
         dueTime = o.text("dueTime"),
         status = o.optString("status", "PENDING"),
         contactPhone = o.text("contactPhone"),
+        customerId = o.text("customerId"),
+        createdAt = o.optLong("createdAt", System.currentTimeMillis()),
+        updatedAt = o.optLong("updatedAt", System.currentTimeMillis()),
+    )
+
+    private fun jsonToCustomer(o: JSONObject) = CustomerEntity(
+        id = o.getString("id"),
+        name = o.getString("name"),
+        phone = o.text("phone"),
+        role = o.optString("role", "BUYER"),
+        preFileId = o.text("preFileId"),
+        unitId = o.text("unitId"),
+        notes = o.text("notes"),
+        status = o.optString("status", "ACTIVE"),
+        createdAt = o.optLong("createdAt", System.currentTimeMillis()),
+        updatedAt = o.optLong("updatedAt", System.currentTimeMillis()),
+    )
+
+    private fun jsonToNote(o: JSONObject) = NoteEntity(
+        id = o.getString("id"),
+        preFileId = o.text("preFileId"),
+        customerId = o.text("customerId"),
+        type = o.optString("type", "CALL"),
+        text = o.getString("text"),
+        outcome = o.text("outcome"),
+        noteDate = o.optString("noteDate", Formatters.todayJalali()),
         createdAt = o.optLong("createdAt", System.currentTimeMillis()),
         updatedAt = o.optLong("updatedAt", System.currentTimeMillis()),
     )

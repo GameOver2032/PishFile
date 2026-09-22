@@ -5,6 +5,9 @@
     <!-- برنامه کاملاً آفلاین کار می‌کند؛ مجوز اینترنت برای همگام‌سازی آینده نگه داشته شده است -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- یادآوری/آلارم پیگیری‌ها -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
 
     <application
         android:name=".PishFileApp"
@@ -39,6 +42,11 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
+
+        <!-- آلارم یادآوری پیگیری‌ها -->
+        <receiver
+            android:name=".core.ReminderReceiver"
+            android:exported="false" />
     </application>
 
 </manifest>

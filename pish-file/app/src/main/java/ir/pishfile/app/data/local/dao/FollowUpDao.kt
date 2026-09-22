@@ -37,6 +37,9 @@ interface FollowUpDao {
     @Query("SELECT * FROM follow_ups WHERE preFileId = :preFileId AND deletedAt IS NULL ORDER BY dueDate")
     fun observeByPreFile(preFileId: String): Flow<List<FollowUpEntity>>
 
+    @Query("SELECT * FROM follow_ups WHERE customerId = :customerId AND deletedAt IS NULL ORDER BY dueDate")
+    fun observeByCustomer(customerId: String): Flow<List<FollowUpEntity>>
+
     @Query("SELECT * FROM follow_ups WHERE id = :id")
     suspend fun getById(id: String): FollowUpEntity?
 

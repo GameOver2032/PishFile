@@ -7,11 +7,15 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import ir.pishfile.app.core.Constants
+import ir.pishfile.app.data.local.dao.CustomerDao
 import ir.pishfile.app.data.local.dao.FollowUpDao
+import ir.pishfile.app.data.local.dao.NoteDao
 import ir.pishfile.app.data.local.dao.PreFileDao
 import ir.pishfile.app.data.local.dao.ProjectDao
 import ir.pishfile.app.data.local.dao.UnitDao
+import ir.pishfile.app.data.local.entity.CustomerEntity
 import ir.pishfile.app.data.local.entity.FollowUpEntity
+import ir.pishfile.app.data.local.entity.NoteEntity
 import ir.pishfile.app.data.local.entity.PreFileEntity
 import ir.pishfile.app.data.local.entity.ProjectEntity
 import ir.pishfile.app.data.local.entity.UnitEntity
@@ -26,8 +30,10 @@ import java.util.UUID
         UnitEntity::class,
         PreFileEntity::class,
         FollowUpEntity::class,
+        CustomerEntity::class,
+        NoteEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class PishFileDatabase : RoomDatabase() {
@@ -36,6 +42,8 @@ abstract class PishFileDatabase : RoomDatabase() {
     abstract fun unitDao(): UnitDao
     abstract fun preFileDao(): PreFileDao
     abstract fun followUpDao(): FollowUpDao
+    abstract fun customerDao(): CustomerDao
+    abstract fun noteDao(): NoteDao
 
     companion object {
         const val DB_NAME = "pishfile.db"
@@ -51,7 +59,7 @@ abstract class PishFileDatabase : RoomDatabase() {
                     DB_NAME
                 )
                     .addCallback(SeedCallback(context))
-                    .addMigrations(MIGRATION_2_3)
+                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4)
                     .fallbackToDestructiveMigration()
                     .build()
                     .also { INSTANCE = it }
@@ -76,6 +84,70 @@ abstract class PishFileDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE projects ADD COLUMN installment_amount INTEGER")
                 db.execSQL("ALTER TABLE projects ADD COLUMN installment_period TEXT")
                 db.execSQL("ALTER TABLE projects ADD COLUMN next_installment_due_date TEXT")
+            }
+        }
+
+        /**
+         * نسخه‌ی ۳ → ۴: افزودن جدول‌های customers و notes و ستون customerId به follow_ups.
+         * مهاجرت واقعی (نه مخرب) تا داده‌های کاربر حفظ شود.
+         */
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS customers (
+                        id TEXT NOT NULL PRIMARY KEY,
+                        name TEXT NOT NULL,
+                        phone TEXT,
+                        role TEXT NOT NULL DEFAULT 'BUYER',
+                        preFileId TEXT,
+                        unitId TEXT,
+                        notes TEXT,
+                        status TEXT NOT NULL DEFAULT 'ACTIVE',
+                        createdAt INTEGER NOT NULL,
+                        updatedAt INTEGER NOT NULL,
+                        remoteId TEXT,
+                        syncState TEXT NOT NULL DEFAULT 'PENDING_UPLOAD',
+                        serverUpdatedAt INTEGER,
+                        deletedAt INTEGER,
+                        FOREIGN KEY(preFileId) REFERENCES pre_files(id) ON UPDATE NO ACTION ON DELETE SET NULL,
+                        FOREIGN KEY(unitId) REFERENCES units(id) ON UPDATE NO ACTION ON DELETE SET NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_customers_preFileId ON customers(preFileId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_customers_unitId ON customers(unitId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_customers_status ON customers(status)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_customers_syncState ON customers(syncState)")
+
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS notes (
+                        id TEXT NOT NULL PRIMARY KEY,
+                        preFileId TEXT,
+                        customerId TEXT,
+                        type TEXT NOT NULL DEFAULT 'CALL',
+                        text TEXT NOT NULL,
+                        outcome TEXT,
+                        noteDate TEXT NOT NULL,
+                        createdAt INTEGER NOT NULL,
+                        updatedAt INTEGER NOT NULL,
+                        remoteId TEXT,
+                        syncState TEXT NOT NULL DEFAULT 'PENDING_UPLOAD',
+                        serverUpdatedAt INTEGER,
+                        deletedAt INTEGER,
+                        FOREIGN KEY(preFileId) REFERENCES pre_files(id) ON UPDATE NO ACTION ON DELETE CASCADE,
+                        FOREIGN KEY(customerId) REFERENCES customers(id) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_notes_preFileId ON notes(preFileId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_notes_customerId ON notes(customerId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_notes_noteDate ON notes(noteDate)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_notes_syncState ON notes(syncState)")
+
+                db.execSQL("ALTER TABLE follow_ups ADD COLUMN customerId TEXT")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_follow_ups_customerId ON follow_ups(customerId)")
             }
         }
 
@@ -239,6 +311,66 @@ abstract class PishFileDatabase : RoomDatabase() {
                         projectId = p1Id,
                         dueDate = today,
                         dueTime = "11:00",
+                        status = Constants.FOLLOWUP_PENDING,
+                        createdAt = now,
+                        updatedAt = now,
+                    )
+                )
+
+                // مشتری نمونه (خریدار فایل خرازی)
+                val c1Id = UUID.randomUUID().toString()
+                database.customerDao().insert(
+                    CustomerEntity(
+                        id = c1Id,
+                        name = "خانم محمدی",
+                        phone = "09123334455",
+                        role = "BUYER",
+                        preFileId = pfId,
+                        status = "ACTIVE",
+                        notes = "به فایل پیش‌فروش علاقه‌مند است؛ شرایط اقساطی می‌خواهد",
+                        createdAt = now,
+                        updatedAt = now,
+                    )
+                )
+
+                // مکالمات و نوت‌های تاریخ‌دار نمونه
+                database.noteDao().insert(
+                    NoteEntity(
+                        preFileId = pfId,
+                        customerId = c1Id,
+                        type = "CALL",
+                        text = "مکالمه‌ی تلفنی اول: معرفی فایل و شرایط پروژه، توضیح نحوه‌ی واریزی و امتیاز",
+                        outcome = "موافق بازدید از پروژه شد",
+                        noteDate = ir.pishfile.app.core.Formatters.addJalaliDays(today, -1),
+                        createdAt = now,
+                        updatedAt = now,
+                    )
+                )
+                database.noteDao().insert(
+                    NoteEntity(
+                        preFileId = pfId,
+                        customerId = c1Id,
+                        type = "VISIT",
+                        text = "بازدید حضوری از پروژه به همراه مشتری؛ بررسی بلوک و واحد",
+                        outcome = "درخواست افزایش تعداد اقساط؛ تا آخر هفته پاسخ می‌دهد",
+                        noteDate = today,
+                        createdAt = now,
+                        updatedAt = now,
+                    )
+                )
+
+                // پیگیری با آلارم برای مشتری
+                database.followUpDao().insert(
+                    FollowUpEntity(
+                        type = "CALL",
+                        priority = "HIGH",
+                        title = "تماس با خانم محمدی برای نهایی‌سازی شرایط اقساط",
+                        contactPhone = "09123334455",
+                        preFileId = pfId,
+                        projectId = p1Id,
+                        customerId = c1Id,
+                        dueDate = today,
+                        dueTime = "15:00",
                         status = Constants.FOLLOWUP_PENDING,
                         createdAt = now,
                         updatedAt = now,
