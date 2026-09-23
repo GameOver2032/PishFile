@@ -27,7 +27,7 @@ data class AttachmentEntity(
     /** نام نمایشی فایل */
     val displayName: String,
 
-    /** نوع MIME (image/*، video/*، application/pdf و…) */
+    /** نوع MIME فایل (مثلاً image/jpeg، video/mp4 یا application/pdf) */
     val mimeType: String,
 
     /** content:// URI فایل */
