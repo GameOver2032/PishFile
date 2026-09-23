@@ -232,7 +232,13 @@ private fun AttachmentPreviewDialog(
                         }
                     },
                     onRelease = { view ->
-                        if (view is VideoView) view.release()
+                        if (view is VideoView) {
+                            try {
+                                view.stopPlayback()
+                            } catch (_: Exception) {
+                                // بی‌اهمیت — فقط آزادسازی پخش
+                            }
+                        }
                     },
                 )
             }
