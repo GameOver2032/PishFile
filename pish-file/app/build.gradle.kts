@@ -29,8 +29,8 @@ android {
         applicationId = "ir.pishfile.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 4
-        versionName = "0.4.0"
+        versionCode = 5
+        versionName = "0.5.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
@@ -109,6 +109,9 @@ dependencies {
 
     // DataStore — تنظیمات برنامه
     implementation(libs.androidx.datastore.preferences)
+
+    // WorkManager — پردازش خودکار اقساط سررسیدشده
+    implementation(libs.androidx.work.runtime.ktx)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

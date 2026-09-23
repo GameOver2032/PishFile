@@ -29,6 +29,7 @@ import ir.pishfile.app.core.Formatters
 import ir.pishfile.app.ui.AppViewModelProvider
 import ir.pishfile.app.ui.components.FormTextField
 import ir.pishfile.app.ui.components.InfoRow
+import ir.pishfile.app.ui.components.GameHeader
 import ir.pishfile.app.ui.components.SectionCard
 import ir.pishfile.app.ui.components.SoftDivider
 import ir.pishfile.app.ui.components.SpacerH
@@ -62,6 +63,13 @@ fun SettingsScreen(
         contentPadding = PaddingValues(12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
+        item {
+            GameHeader(
+                title = "تنظیمات",
+                emoji = "⚙️",
+                subtitle = "مدیریت برنامه، پشتیبان‌گیری و ظاهر",
+            )
+        }
         message?.let { text ->
             item {
                 Snackbar(

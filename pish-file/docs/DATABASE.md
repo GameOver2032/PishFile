@@ -2,11 +2,12 @@
 
 # مدل داده — فیلدهای تخصصی پیش‌فروش املاک
 
-دیتابیس: SQLite با Room — نام فایل: `pishfile.db` (**نسخه ۴**).
+دیتابیس: SQLite با Room — نام فایل: `pishfile.db` (**نسخه ۵**).
 
 > **مهاجرت‌ها:**
 > - **۲ → ۳** (`MIGRATION_2_3`): افزودن «پیش‌فرض‌های ثبت فایل» به `projects` با `ALTER TABLE … ADD COLUMN`
-> - **۳ → ۴** (`MIGRATION_3_4`): ایجاد جدول‌های `customers` و `notes` + افزودن ستون `customerId` به `follow_ups`
+> - **۳ → ** (`MIGRATION_3_4`): ایجاد جدول‌های `customers` و `notes` + افزودن ستون `customerId` به `follow_ups`
+> - **۴ → ۵** (`MIGRATION_4_5`): ایجاد جدول‌های `project_areas` (متراژهای پروژه) و `attachments` (پیوست فایل/عکس/ویدیو) + ستون `approx_total_price` روی `projects` + ستون‌های `fileType` و `areaId` روی `pre_files`
 >
 > همه‌ی مهاجرت‌ها **واقعی (غیرمخرب)** هستند؛ یعنی **داده‌های کاربر هنگام به‌روزرسانی حفظ می‌شود** و نیازی به بکاپ و نصب مجدد نیست.
 
@@ -21,6 +22,8 @@
 | `pre_files` | `PreFileEntity` | فایل پیش‌فروش (قرارداد پیش‌فروش یک واحد) |
 | `customers` | `CustomerEntity` | مشتری / طرف‌مذاکره (خریدار/فروشنده) — ۰.۴.۰ |
 | `notes` | `NoteEntity` | نوت/مکالمه‌ی تاریخ‌دار — ۰.۴.۰ |
+| `project_areas` | `ProjectAreaEntity` | متراژهای پروژه با شرایط مالی مخصوص هرکدام — ۰.۵.۰ |
+| `attachments` | `AttachmentEntity` | پیوست (فایل/عکس/ویدیو) متصل به فایل یا واحد — ۰.۵.۰ |
 | `follow_ups` | `FollowUpEntity` | پیگیری‌ها (با آلارم) |
 
 ## رابطه‌ها

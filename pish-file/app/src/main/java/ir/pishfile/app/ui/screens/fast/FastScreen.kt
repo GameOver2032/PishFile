@@ -1,7 +1,6 @@
 package ir.pishfile.app.ui.screens.fast
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -36,8 +35,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -51,6 +48,7 @@ import ir.pishfile.app.core.Formatters
 import ir.pishfile.app.data.local.entity.FollowUpEntity
 import ir.pishfile.app.data.local.entity.NoteEntity
 import ir.pishfile.app.ui.AppViewModelProvider
+import ir.pishfile.app.ui.components.GameButton
 import ir.pishfile.app.ui.components.NoteDialog
 import ir.pishfile.app.ui.components.NoteTimelineCard
 import ir.pishfile.app.ui.components.NotificationPermissionHint
@@ -137,7 +135,7 @@ fun FastScreen(
 
         // --- دکمه‌های بزرگ بازی‌گونه ---
         item {
-            GameActionButton(
+            GameButton(
                 emoji = "📄",
                 title = "فایل جدید",
                 subtitle = "ثبت سریع یک فایل پیش‌فروش",
@@ -146,7 +144,7 @@ fun FastScreen(
             )
         }
         item {
-            GameActionButton(
+            GameButton(
                 emoji = "👥",
                 title = "مشتری جدید",
                 subtitle = "ثبت مشتری / خریدار برای یک فایل",
@@ -343,54 +341,6 @@ private fun GameStatCard(
                 color = color,
             )
             Text(label, style = MaterialTheme.typography.labelSmall)
-        }
-    }
-}
-
-/** دکمه‌ی بزرگ گرادیانی — حس دکمه‌ی بازی */
-@Composable
-private fun GameActionButton(
-    emoji: String,
-    title: String,
-    subtitle: String,
-    gradient: List<Color>,
-    onClick: () -> Unit,
-) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .shadow(
-                elevation = 8.dp,
-                shape = RoundedCornerShape(26.dp),
-                ambientColor = Color.Black.copy(alpha = 0.25f),
-                spotColor = Color.Black.copy(alpha = 0.25f),
-            )
-            .clip(RoundedCornerShape(26.dp))
-            .background(Brush.linearGradient(gradient))
-            .clickable(onClick = onClick),
-    ) {
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 18.dp, vertical = 18.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(emoji, fontSize = 36.sp)
-            Spacer(Modifier.width(14.dp))
-            Column(Modifier.weight(1f)) {
-                Text(
-                    title,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = Color.White,
-                )
-                Text(
-                    subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color.White.copy(alpha = 0.85f),
-                )
-            }
-            Text("‹", fontSize = 30.sp, color = Color.White.copy(alpha = 0.7f), fontWeight = FontWeight.Bold)
         }
     }
 }

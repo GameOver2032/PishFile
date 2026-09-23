@@ -27,12 +27,13 @@ import ir.pishfile.app.ui.viewmodel.UnitListViewModel
 object AppViewModelProvider {
     val Factory = viewModelFactory {
         initializer { ProjectListViewModel(container().projectRepository) }
-        initializer { ProjectEditViewModel(container().projectRepository) }
+        initializer { ProjectEditViewModel(container().projectRepository, container().projectAreaRepository) }
         initializer {
             ProjectDetailViewModel(
                 container().projectRepository,
                 container().unitRepository,
                 container().preFileRepository,
+                container().projectAreaRepository,
             )
         }
 
@@ -43,6 +44,7 @@ object AppViewModelProvider {
                 container().unitRepository,
                 container().projectRepository,
                 container().preFileRepository,
+                container().attachmentRepository,
             )
         }
 
@@ -52,6 +54,7 @@ object AppViewModelProvider {
                 container().preFileRepository,
                 container().projectRepository,
                 container().unitRepository,
+                container().projectAreaRepository,
             )
         }
         initializer {
@@ -59,6 +62,7 @@ object AppViewModelProvider {
                 container().preFileRepository,
                 container().projectRepository,
                 container().unitRepository,
+                container().projectAreaRepository,
             )
         }
         initializer {
@@ -68,6 +72,7 @@ object AppViewModelProvider {
                 container().followUpRepository,
                 container().customerRepository,
                 container().noteRepository,
+                container().attachmentRepository,
             )
         }
 

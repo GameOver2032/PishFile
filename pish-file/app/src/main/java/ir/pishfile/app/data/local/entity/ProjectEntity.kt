@@ -117,6 +117,13 @@ data class ProjectEntity(
     @ColumnInfo(name = "share_price")
     val sharePrice: Long? = null,
 
+    /**
+     * قیمت حدودی کل پروژه — برای پروژه‌های سهامی که ممکن است
+     * دارای واریزی و امتیاز هم باشند.
+     */
+    @ColumnInfo(name = "approx_total_price")
+    val approxTotalPrice: Long? = null,
+
     /** بودجه کل پروژه */
     @ColumnInfo(name = "total_budget")
     val totalBudget: Long? = null,

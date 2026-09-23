@@ -41,6 +41,8 @@ import ir.pishfile.app.data.local.entity.NoteEntity
 import ir.pishfile.app.core.Formatters
 import ir.pishfile.app.ui.AppViewModelProvider
 import ir.pishfile.app.ui.components.FollowUpDialog
+import ir.pishfile.app.ui.components.GameHeader
+import ir.pishfile.app.ui.components.GameStat
 import ir.pishfile.app.ui.components.EmptyState
 import ir.pishfile.app.ui.components.FilterChipsRow
 import ir.pishfile.app.ui.components.NoteDialog
@@ -76,6 +78,13 @@ fun FollowUpsScreen(
     }
 
     Column(Modifier.fillMaxSize()) {
+        GameHeader(
+            title = "پیگیری‌ها و مکالمات",
+            emoji = "📌",
+            subtitle = "تماس‌ها، بازدیدها و نتیجه‌ی مکالمات",
+            stats = listOf(GameStat(Formatters.number(followUps.size), "پیگیری")),
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+        )
         Row(
             Modifier
                 .fillMaxWidth()

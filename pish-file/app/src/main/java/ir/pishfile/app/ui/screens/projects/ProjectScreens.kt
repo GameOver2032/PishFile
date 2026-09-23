@@ -39,10 +39,13 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ir.pishfile.app.core.Constants
+import ir.pishfile.app.data.local.entity.ProjectAreaEntity
 import ir.pishfile.app.core.Formatters
 import ir.pishfile.app.data.local.entity.ProjectEntity
 import ir.pishfile.app.ui.AppViewModelProvider
 import ir.pishfile.app.ui.components.ConfirmDialog
+import ir.pishfile.app.ui.components.GameHeader
+import ir.pishfile.app.ui.components.GameStat
 import ir.pishfile.app.ui.components.DropdownField
 import ir.pishfile.app.ui.components.EmptyState
 import ir.pishfile.app.ui.components.InfoRow
@@ -55,6 +58,7 @@ import ir.pishfile.app.ui.components.SpacerH
 import ir.pishfile.app.ui.components.StatusChip
 import ir.pishfile.app.ui.viewmodel.ProjectDetailViewModel
 import ir.pishfile.app.ui.viewmodel.ProjectEditViewModel
+import ir.pishfile.app.ui.viewmodel.ProjectAreaItem
 import ir.pishfile.app.ui.viewmodel.ProjectForm
 import ir.pishfile.app.ui.viewmodel.ProjectListViewModel
 
@@ -68,6 +72,13 @@ fun ProjectListScreen(
     val projects by viewModel.projects.collectAsStateWithLifecycle()
 
     Column(Modifier.fillMaxSize()) {
+        GameHeader(
+            title = "پروژه‌ها",
+            emoji = "🏗️",
+            subtitle = "پروژه‌های ساختمانی و متراژهای آن‌ها",
+            stats = listOf(GameStat(Formatters.number(projects.size), "کل پروژه‌ها")),
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+        )
         SearchField(
             query = query,
             onQueryChange = {
@@ -210,6 +221,14 @@ fun ProjectEditScreen(
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         item {
+            GameHeader(
+                title = if (projectId == null) "پروژه جدید" else "ویرایش پروژه",
+                emoji = "🏗️",
+                subtitle = "مشخصات، مدل قیمت‌گذاری، متراژها و پیش‌فرض‌های ثبت فایل",
+            )
+        }
+
+        item {
             SectionCard(title = "مشخصات اصلی پروژه") {
                 ir.pishfile.app.ui.components.FormTextField(
                     value = form.name,
@@ -318,6 +337,29 @@ fun ProjectEditScreen(
                                 modifier = Modifier.weight(1.5f),
                             )
                         }
+                        SpacerH(8)
+                        Text(
+                            "پروژه‌های سهامی ممکن است واریزی و امتیاز هم داشته باشند:",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        SpacerH(6)
+                        MoneyField(
+                            value = form.defaultDepositAmount,
+                            onValueChange = { v -> viewModel.update { it.copy(defaultDepositAmount = v) } },
+                            label = "مبلغ واریزی پروژه (اختیاری)",
+                        )
+                        SpacerH(8)
+                        MoneyField(
+                            value = form.defaultBonusAmount,
+                            onValueChange = { v -> viewModel.update { it.copy(defaultBonusAmount = v) } },
+                            label = "مبلغ امتیاز (اختیاری)",
+                        )
+                        SpacerH(8)
+                        MoneyField(
+                            value = form.approxTotalPrice,
+                            onValueChange = { v -> viewModel.update { it.copy(approxTotalPrice = v) } },
+                            label = "قیمت حدودی کل پروژه (اختیاری)",
+                        )
                     }
                     else -> { // METER
                         MoneyField(
@@ -328,6 +370,16 @@ fun ProjectEditScreen(
                     }
                 }
             }
+        }
+
+        // متراژهای پروژه با شرایط مالی مخصوص هرکدام
+        item {
+            AreasEditor(
+                areas = form.areas,
+                onAdd = { viewModel.addArea() },
+                onItemChange = { id, transform -> viewModel.updateArea(id, transform) },
+                onItemRemove = { id -> viewModel.removeArea(id) },
+            )
         }
 
         // پیش‌فرض‌های ثبت فایل: رتبه، شرایط فروش و اقساط
@@ -514,6 +566,7 @@ fun ProjectDetailScreen(
     val project by viewModel.project.collectAsStateWithLifecycle()
     val units by viewModel.units.collectAsStateWithLifecycle()
     val preFiles by viewModel.preFiles.collectAsStateWithLifecycle()
+    val areas by viewModel.areas.collectAsStateWithLifecycle()
     var showDelete by remember { mutableStateOf(false) }
 
     val current = project ?: return
@@ -523,6 +576,19 @@ fun ProjectDetailScreen(
         contentPadding = PaddingValues(12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
+        item {
+            GameHeader(
+                title = current.name,
+                emoji = "🏗️",
+                subtitle = listOfNotNull(current.city, current.district).joinToString(" • "),
+                stats = listOf(
+                    GameStat(Formatters.percent(current.progressPercent), "پیشرفت"),
+                    GameStat(Formatters.number(areas.size), "متراژ"),
+                    GameStat(Formatters.number(preFiles.size), "فایل"),
+                ),
+            )
+        }
+
         item {
             SectionCard(title = current.name, subtitle = listOfNotNull(current.city, current.district).joinToString(" • ")) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -545,12 +611,17 @@ fun ProjectDetailScreen(
                 when (current.pricingModel) {
                     Constants.PRICING_DEPOSIT_BONUS -> {
                         InfoRow("مدل فروش", "واریزی و امتیاز")
-                        InfoRow("واریزی پیش‌فرض تا امروز", Formatters.amountWithUnit(current.defaultDepositAmount), emphasize = true)
+                        InfoRow("واریزی تا امروز", Formatters.amountWithUnit(current.defaultDepositAmount), emphasize = true)
+                        InfoRow("مجموع واریزی + امتیاز", formatters_sum(current.defaultDepositAmount, current.defaultBonusAmount), emphasize = true)
                     }
                     Constants.PRICING_SHARE -> {
                         InfoRow("مدل فروش", "سهامی")
                         InfoRow("متراژ هر سهم", current.shareMeterArea?.let { "${Formatters.number(it.toInt())} م²" })
                         InfoRow("قیمت هر سهم", Formatters.amountWithUnit(current.sharePrice), emphasize = true)
+                        InfoRow("واریزی پروژه", Formatters.amountWithUnit(current.defaultDepositAmount))
+                        InfoRow("مبلغ امتیاز", Formatters.amountWithUnit(current.defaultBonusAmount))
+                        InfoRow("قیمت حدودی کل", Formatters.amountWithUnit(current.approxTotalPrice), emphasize = true)
+                        InfoRow("مجموع واریزی + امتیاز", formatters_sum(current.defaultDepositAmount, current.defaultBonusAmount), emphasize = true)
                     }
                     else -> {
                         InfoRow("مدل فروش", "قیمت متری")
@@ -604,6 +675,59 @@ fun ProjectDetailScreen(
                     current.nextInstallmentDueDate?.let { Formatters.toPersianDigits(it) },
                     emphasize = true,
                 )
+                Text(
+                    "✅ وقتی به تاریخ سررسید رسیدیم، قسط به‌صورت خودکار از اینجا پاک می‌شود و مبلغش به واریزی پروژه اضافه می‌شود.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+        }
+
+        item {
+            SectionCard(
+                title = "متراژهای پروژه (${Formatters.number(areas.size)})",
+                subtitle = "هر متراژ شرایط مالی مخصوص خودش را دارد؛ هنگام ثبت فایل انتخاب می‌شود",
+            ) {
+                if (areas.isEmpty()) {
+                    Text(
+                        "متراژی ثبت نشده — برای پروژه‌های چند متراژ، متراژها را از بخش ویرایش پروژه اضافه کنید",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    areas.forEach { area ->
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                        ) {
+                            Column(Modifier.padding(10.dp)) {
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                    Text(
+                                        area.label + (area.areaValue?.let { " — ${Formatters.number(it.toInt())} م²" } ?: ""),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Bold,
+                                    )
+                                    area.totalPrice?.let {
+                                        StatusChip(Formatters.amountShort(it) + " تومان", MaterialTheme.colorScheme.primary)
+                                    }
+                                }
+                                SpacerH(4)
+                                Text(
+                                    listOfNotNull(
+                                        area.depositAmount?.let { "واریزی: ${Formatters.amountShort(it)}" },
+                                        area.bonusAmount?.let { "امتیاز: ${Formatters.amountShort(it)}" },
+                                        area.installmentCount?.let { "${Formatters.number(it)} قسط" },
+                                        area.installmentAmount?.let { "مبلغ قسط: ${Formatters.amountShort(it)}" },
+                                        area.installmentPeriod?.let { "دوره: $it" },
+                                    ).joinToString(" • "),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                        SpacerH(6)
+                    }
+                }
             }
         }
 
@@ -706,4 +830,114 @@ fun ProjectDetailScreen(
             onDismiss = { showDelete = false },
         )
     }
+}
+
+// ---------------------------------------------------------------------------
+// ویرایشگر متراژهای پروژه
+// ---------------------------------------------------------------------------
+@Composable
+private fun AreasEditor(
+    areas: List<ProjectAreaItem>,
+    onAdd: () -> Unit,
+    onItemChange: (String, (ProjectAreaItem) -> ProjectAreaItem) -> Unit,
+    onItemRemove: (String) -> Unit,
+) {
+    SectionCard(
+        title = "متراژهای پروژه",
+        subtitle = "اگر پروژه چند متراژ دارد، هر متراژ واریزی، امتیاز، قیمت کل و شرایط اقساط مخصوص خودش را دارد؛ هنگام ثبت فایل، متراژ انتخاب می‌شود",
+        trailing = {
+            OutlinedButton(onClick = onAdd) { Text("افزودن متراژ") }
+        },
+    ) {
+        if (areas.isEmpty()) {
+            Text(
+                "متراژی ثبت نشده — برای پروژه‌ای با متراژهای مختلف، هر متراژ را با شرایط مالی‌اش اضافه کنید",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        } else {
+            areas.forEachIndexed { index, area ->
+                Column(Modifier.padding(vertical = 6.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            "متراژ ${Formatters.number(index + 1)}",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.weight(1f),
+                        )
+                        IconButton(onClick = { onItemRemove(area.id) }) {
+                            Icon(Icons.Filled.Delete, contentDescription = "حذف متراژ", tint = MaterialTheme.colorScheme.error)
+                        }
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        NumberField(
+                            value = area.areaValue,
+                            onValueChange = { v -> onItemChange(area.id) { it.copy(areaValue = v) } },
+                            label = "متراژ",
+                            suffix = "م²",
+                            decimal = true,
+                            modifier = Modifier.weight(1f),
+                        )
+                        FormTextField(
+                            value = area.label,
+                            onValueChange = { v -> onItemChange(area.id) { it.copy(label = v) } },
+                            label = "برچسب (اختیاری)",
+                            modifier = Modifier.weight(1.2f),
+                        )
+                    }
+                    SpacerH(8)
+                    MoneyField(
+                        value = area.totalPrice,
+                        onValueChange = { v -> onItemChange(area.id) { it.copy(totalPrice = v) } },
+                        label = "قیمت کل این متراژ",
+                    )
+                    SpacerH(8)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        MoneyField(
+                            value = area.depositAmount,
+                            onValueChange = { v -> onItemChange(area.id) { it.copy(depositAmount = v) } },
+                            label = "واریزی",
+                            modifier = Modifier.weight(1f),
+                        )
+                        MoneyField(
+                            value = area.bonusAmount,
+                            onValueChange = { v -> onItemChange(area.id) { it.copy(bonusAmount = v) } },
+                            label = "امتیاز",
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                    SpacerH(8)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        NumberField(
+                            value = area.installmentCount,
+                            onValueChange = { v -> onItemChange(area.id) { it.copy(installmentCount = v) } },
+                            label = "تعداد اقساط",
+                            modifier = Modifier.weight(1f),
+                        )
+                        MoneyField(
+                            value = area.installmentAmount,
+                            onValueChange = { v -> onItemChange(area.id) { it.copy(installmentAmount = v) } },
+                            label = "مبلغ هر قسط",
+                            modifier = Modifier.weight(1.2f),
+                        )
+                        DropdownField(
+                            label = "دوره پرداخت",
+                            options = listOf("ماهانه", "دو ماهه", "سه ماهه / فصلی", "شش ماهه", "سالانه"),
+                            selected = area.installmentPeriod.takeIf { it.isNotBlank() },
+                            onSelect = { v -> onItemChange(area.id) { it.copy(installmentPeriod = v) } },
+                            allowEmpty = true,
+                            emptyLabel = "انتخاب کنید",
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** مجموع واریزی + امتیاز (نمایش «—» اگر هر دو خالی باشد) */
+private fun formatters_sum(deposit: Long?, bonus: Long?): String {
+    val total = (deposit ?: 0L) + (bonus ?: 0L)
+    return if (total > 0) Formatters.amountWithUnit(total) else "—"
 }

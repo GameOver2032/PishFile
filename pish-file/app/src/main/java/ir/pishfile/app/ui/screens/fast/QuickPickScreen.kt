@@ -35,6 +35,7 @@ import ir.pishfile.app.data.local.dao.PreFileRow
 import ir.pishfile.app.data.local.entity.UnitEntity
 import ir.pishfile.app.ui.AppViewModelProvider
 import ir.pishfile.app.ui.components.EmptyState
+import ir.pishfile.app.ui.components.GameHeader
 import ir.pishfile.app.ui.components.SearchField
 import ir.pishfile.app.ui.components.SectionTitle
 import ir.pishfile.app.ui.components.SpacerH
@@ -43,8 +44,8 @@ import ir.pishfile.app.ui.components.preFileStatusColor
 import ir.pishfile.app.ui.components.unitStatusColor
 import ir.pishfile.app.ui.viewmodel.QuickPickViewModel
 
-/** حالت انتخاب: برای ثبت فایل یا برای ثبت مشتری */
-enum class QuickPickMode { FILE, CUSTOMER }
+/** حالت انتخاب: فایل واحد آماده، فایل پیش‌فروش، یا ثبت مشتری */
+enum class QuickPickMode { READY_UNIT, PRESALE, CUSTOMER }
 
 /**
  * «از کجا شروع کنیم؟» — اولین قدم فرایند ثبت:
@@ -68,9 +69,15 @@ fun QuickPickScreen(
     val projectById = projects.associateBy { it.id }
     val q = query.trim()
 
+    val statusAllowed = when (mode) {
+        QuickPickMode.READY_UNIT -> { unit: UnitEntity -> unit.status == Constants.UNIT_AVAILABLE }
+        else -> { _: UnitEntity -> true }
+    }
     val visibleUnits = (if (q.isBlank()) units else units.filter {
         it.displayTitle.contains(q, true) || projectById[it.projectId]?.name?.contains(q, true) == true
-    }).sortedWith(compareBy({ it.status != Constants.UNIT_AVAILABLE }, { it.id }))
+    })
+        .filter { statusAllowed(it) }
+        .sortedWith(compareBy({ it.status != Constants.UNIT_AVAILABLE }, { it.id }))
 
     val visiblePreFiles = if (mode != QuickPickMode.CUSTOMER) emptyList()
     else (
@@ -85,21 +92,24 @@ fun QuickPickScreen(
     val hasAny = visibleUnits.isNotEmpty() || visiblePreFiles.isNotEmpty()
 
     Column(Modifier.fillMaxSize()) {
-        Column(Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
-            Text(
-                if (mode == QuickPickMode.FILE) "فایل جدید" else "مشتری جدید",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-            )
-            Text(
-                if (mode == QuickPickMode.FILE)
-                    "اول واحد را انتخاب کن — شرایط پروژه‌اش خودکار پر می‌شود"
-                else
-                    "مشتری برای کدام واحد یا فایل پیش‌فروش است؟",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        GameHeader(
+            title = when (mode) {
+                QuickPickMode.READY_UNIT -> "فایل واحد آماده"
+                QuickPickMode.PRESALE -> "فایل پیش‌فروش"
+                QuickPickMode.CUSTOMER -> "مشتری جدید"
+            },
+            emoji = when (mode) {
+                QuickPickMode.READY_UNIT -> "🏠"
+                QuickPickMode.PRESALE -> "📄"
+                QuickPickMode.CUSTOMER -> "👤"
+            },
+            subtitle = when (mode) {
+                QuickPickMode.READY_UNIT -> "یک واحد آماده انتخاب کن — شرایط پروژه‌اش خودکار پر می‌شود"
+                QuickPickMode.PRESALE -> "اول واحد را انتخاب کن — شرایط پروژه‌اش خودکار پر می‌شود"
+                QuickPickMode.CUSTOMER -> "مشتری برای کدام واحد یا فایل پیش‌فروش است؟"
+            },
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+        )
 
         SearchField(
             query = query,
@@ -129,7 +139,7 @@ fun QuickPickScreen(
                     UnitPickRow(unit, projectById[unit.projectId]?.name, onClick = { onPickUnit(unit.id, unit.projectId) })
                 }
             }
-            if (reserved.isNotEmpty()) {
+            if (reserved.isNotEmpty() && mode != QuickPickMode.READY_UNIT) {
                 item { SectionTitle("واحدهای پیش‌فروشی") }
                 items(reserved, key = { it.id }) { unit ->
                     UnitPickRow(unit, projectById[unit.projectId]?.name, onClick = { onPickUnit(unit.id, unit.projectId) })

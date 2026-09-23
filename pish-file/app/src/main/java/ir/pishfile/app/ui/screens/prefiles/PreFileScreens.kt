@@ -42,11 +42,14 @@ import ir.pishfile.app.core.Constants
 import ir.pishfile.app.core.Formatters
 import ir.pishfile.app.data.local.entity.PreFileEntity
 import ir.pishfile.app.ui.AppViewModelProvider
+import ir.pishfile.app.ui.components.AttachmentSection
 import ir.pishfile.app.ui.components.ConfirmDialog
 import ir.pishfile.app.ui.components.DropdownField
 import ir.pishfile.app.ui.components.EmptyState
 import ir.pishfile.app.ui.components.FilterChipsRow
 import ir.pishfile.app.ui.components.FormTextField
+import ir.pishfile.app.ui.components.GameHeader
+import ir.pishfile.app.ui.components.GameStat
 import ir.pishfile.app.ui.components.InfoRow
 import ir.pishfile.app.ui.components.JalaliDateField
 import ir.pishfile.app.ui.components.MoneyField
@@ -75,8 +78,16 @@ fun PreFileListScreen(
     var pendingDelete by remember { mutableStateOf<PreFileEntity?>(null) }
 
     val preFiles by viewModel.preFiles.collectAsStateWithLifecycle()
+    val totalCount by viewModel.totalCount.collectAsStateWithLifecycle()
 
     Column(Modifier.fillMaxSize()) {
+        GameHeader(
+            title = "فایل‌ها",
+            emoji = "📄",
+            subtitle = "فایل‌های پیش‌فروش و واحدهای آماده",
+            stats = listOf(GameStat(Formatters.number(totalCount), "کل فایل‌ها")),
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+        )
         SearchField(
             query = query,
             onQueryChange = {
@@ -153,6 +164,7 @@ private fun PreFileCard(
                     Text(
                         listOfNotNull(
                             row.unitTitle,
+                            row.areaLabel,
                             preFile.ownerName?.let { "مالک: $it" },
                             Formatters.toPersianDigits(preFile.draftDate)
                         ).joinToString(" • "),
@@ -161,6 +173,9 @@ private fun PreFileCard(
                     )
                 }
                 StatusChip(Constants.preFileStatusLabel(preFile.status), preFileStatusColor(preFile.status))
+                if (preFile.fileType == Constants.FILE_TYPE_READY) {
+                    StatusChip("واحد آماده", MaterialTheme.colorScheme.primary)
+                }
                 IconButton(onClick = onDelete) {
                     Icon(Icons.Filled.Delete, contentDescription = "حذف", tint = MaterialTheme.colorScheme.error)
                 }
@@ -256,6 +271,13 @@ fun PreFileEditScreen(
         contentPadding = PaddingValues(12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
+        item {
+            GameHeader(
+                title = if (preFileId == null) "ثبت فایل پیش‌فروش" else "ویرایش فایل",
+                emoji = "📄",
+                subtitle = "فرم کامل ثبت / ویرایش فایل",
+            )
+        }
         // --- ۱) پروژه و واحد ---
         item {
             SectionCard(
@@ -622,6 +644,7 @@ fun PreFileDetailScreen(
     val unit by viewModel.unit.collectAsStateWithLifecycle()
     val customers by viewModel.customers.collectAsStateWithLifecycle()
     val notes by viewModel.notes.collectAsStateWithLifecycle()
+    val attachments by viewModel.attachments.collectAsStateWithLifecycle()
 
     var showDelete by remember { mutableStateOf(false) }
     var showStatusMenu by remember { mutableStateOf(false) }
@@ -635,6 +658,21 @@ fun PreFileDetailScreen(
         contentPadding = PaddingValues(12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
+        item {
+            GameHeader(
+                title = pf.draftNumber,
+                emoji = if (pf.fileType == Constants.FILE_TYPE_READY) "🏠" else "📄",
+                subtitle = listOfNotNull(currentRow.projectName, currentRow.unitTitle).joinToString(" • "),
+                stats = listOf(
+                    GameStat(Constants.fileTypeLabel(pf.fileType), "نوع فایل"),
+                    GameStat(
+                        if (pf.displayPrice > 0) Formatters.amountShort(pf.displayPrice) else "—",
+                        "قیمت کل (تومان)",
+                    ),
+                ),
+            )
+        }
+
         item {
             SectionCard(
                 title = "${pf.draftNumber} • ${currentRow.projectName ?: "پروژه"}",
@@ -665,6 +703,8 @@ fun PreFileDetailScreen(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     StatusChip(Constants.preFileStatusLabel(pf.status), preFileStatusColor(pf.status))
                     SpacerH(0)
+                    StatusChip(Constants.fileTypeLabel(pf.fileType), MaterialTheme.colorScheme.secondary)
+                    SpacerH(0)
                     Text(
                         "  تاریخ ثبت: ${Formatters.toPersianDigits(pf.draftDate)}",
                         style = MaterialTheme.typography.labelMedium,
@@ -672,6 +712,7 @@ fun PreFileDetailScreen(
                     )
                 }
                 SpacerH(8)
+                currentRow.areaLabel?.let { InfoRow("متراژ انتخاب‌شده", it, emphasize = true) }
                 InfoRow("مالک / سپارنده", pf.ownerName)
                 InfoRow("شماره تماس", pf.ownerPhone)
                 InfoRow("مدل پروژه", Constants.projectPricingModelLabel(pf.pricingModel))
@@ -828,6 +869,22 @@ fun PreFileDetailScreen(
                         }
                     }
                 }
+            }
+        }
+
+        // --- پیوست‌ها: فایل، عکس و ویدیو ---
+        item {
+            SectionCard(
+                title = "پیوست‌ها",
+                subtitle = "فایل، عکس و ویدیوی مرتبط با این فایل پیش‌فروش",
+            ) {
+                AttachmentSection(
+                    ownerType = Constants.ATTACH_PREFILE,
+                    ownerId = pf.id,
+                    attachments = attachments,
+                    onAdd = { viewModel.saveAttachment(it) },
+                    onDelete = { viewModel.deleteAttachment(it) },
+                )
             }
         }
 

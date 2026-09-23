@@ -8,15 +8,19 @@ import androidx.lifecycle.viewModelScope
 import ir.pishfile.app.core.Constants
 import ir.pishfile.app.core.Formatters
 import ir.pishfile.app.data.local.dao.PreFileRow
+import ir.pishfile.app.data.local.entity.AttachmentEntity
 import ir.pishfile.app.data.local.entity.CustomerEntity
 import ir.pishfile.app.data.local.entity.NoteEntity
 import ir.pishfile.app.data.local.entity.PreFileEntity
+import ir.pishfile.app.data.local.entity.ProjectAreaEntity
 import ir.pishfile.app.data.local.entity.ProjectEntity
 import ir.pishfile.app.data.local.entity.UnitEntity
+import ir.pishfile.app.data.repository.AttachmentRepository
 import ir.pishfile.app.data.repository.CustomerRepository
 import ir.pishfile.app.data.repository.FollowUpRepository
 import ir.pishfile.app.data.repository.NoteRepository
 import ir.pishfile.app.data.repository.PreFileRepository
+import ir.pishfile.app.data.repository.ProjectAreaRepository
 import ir.pishfile.app.data.repository.ProjectRepository
 import ir.pishfile.app.data.repository.UnitRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -86,6 +90,10 @@ data class PreFileForm(
     val status: String = Constants.PREFILE_NORMAL,
     val deliveryDate: String = "",
     val notes: String = "",
+
+    // نوع فایل (واحد آماده / پیش‌فروش) و متراژ انتخاب‌شده از متراژهای پروژه
+    val fileType: String = Constants.FILE_TYPE_PRESALE,
+    val areaId: String = "",
 ) {
     val depositValue: Long get() = Formatters.parseLong(depositAmount) ?: 0L
     val bonusValue: Long get() = Formatters.parseLong(bonusAmount) ?: 0L
@@ -141,6 +149,8 @@ data class PreFileForm(
             status = status,
             deliveryDate = deliveryDate.ifBlank { null },
             notes = notes.ifBlank { null },
+            fileType = fileType,
+            areaId = areaId.ifBlank { null },
             isFavorite = existing?.isFavorite ?: false,
             createdAt = existing?.createdAt ?: System.currentTimeMillis(),
             updatedAt = System.currentTimeMillis(),
@@ -178,6 +188,8 @@ data class PreFileForm(
             status = entity.status,
             deliveryDate = entity.deliveryDate.orEmpty(),
             notes = entity.notes.orEmpty(),
+            fileType = entity.fileType ?: Constants.FILE_TYPE_PRESALE,
+            areaId = entity.areaId.orEmpty(),
         )
     }
 }
@@ -211,6 +223,7 @@ open class PreFileEditViewModel(
     protected val repository: PreFileRepository,
     protected val projectRepository: ProjectRepository,
     protected val unitRepository: UnitRepository,
+    protected val projectAreaRepository: ProjectAreaRepository,
 ) : ViewModel() {
 
     var form by mutableStateOf(PreFileForm())
@@ -219,6 +232,8 @@ open class PreFileEditViewModel(
     var projects by mutableStateOf<List<ProjectEntity>>(emptyList())
         private set
     var availableUnits by mutableStateOf<List<UnitEntity>>(emptyList())
+        private set
+    var projectAreas by mutableStateOf<List<ProjectAreaEntity>>(emptyList())
         private set
 
     private var existing: PreFileEntity? = null
@@ -243,7 +258,7 @@ open class PreFileEditViewModel(
         }
     }
 
-    fun startNew(projectId: String?, unitId: String?) {
+    fun startNew(projectId: String?, unitId: String?, fileType: String = Constants.FILE_TYPE_PRESALE) {
         if (isLoaded) return
         viewModelScope.launch {
             projects = projectRepository.getAll()
@@ -262,6 +277,7 @@ open class PreFileEditViewModel(
                 projectId = defaultProject,
                 unitId = selectedUnit?.id.orEmpty(),
                 status = Constants.PREFILE_NORMAL,
+                fileType = fileType,
             )
 
             // اگر پروژه انتخاب شده باشد، ویژگی‌های پروژه را روی فرم بنشان
@@ -273,7 +289,20 @@ open class PreFileEditViewModel(
                 applyUnitToForm(selectedUnit!!)
             }
 
+            loadProjectAreas(defaultProject)
+
             isLoaded = true
+        }
+    }
+
+    /** بارگذاری متراژهای پروژه + انتخاب خودکار اگر فقط یک متراژ داشته باشد */
+    private fun loadProjectAreas(projectId: String) {
+        viewModelScope.launch {
+            val areas = if (projectId.isBlank()) emptyList() else projectAreaRepository.getByProject(projectId)
+            projectAreas = areas
+            if (areas.size == 1) {
+                applyAreaToForm(areas.first())
+            }
         }
     }
 
@@ -294,12 +323,15 @@ open class PreFileEditViewModel(
                 ownerName = kept.ownerName,
                 ownerPhone = kept.ownerPhone,
                 status = kept.status,
+                fileType = kept.fileType,
             )
             selectedUnit = null
             if (project != null) {
                 applyProjectToForm(project)
             }
         }
+        // متراژها را دوباره بارگذاری می‌کنیم (با یک متراژ، خودکار انتخاب می‌شود)
+        loadProjectAreas(projectId)
     }
 
     /** پروژه‌ی انتخاب‌شده در فرم */
@@ -364,6 +396,26 @@ open class PreFileEditViewModel(
         )
     }
 
+    /** انتخاب متراژ از متراژهای پروژه — شرایط مالی آن متراژ روی فرم می‌نشیند */
+    fun selectArea(areaId: String) {
+        val area = projectAreas.firstOrNull { it.id == areaId } ?: return
+        applyAreaToForm(area)
+    }
+
+    /** شرایط مالی متراژ انتخاب‌شده روی فرم بنشیند (فقط فیلدهایی که متراژ مقدار دارد) */
+    private fun applyAreaToForm(area: ProjectAreaEntity) {
+        form = form.copy(
+            areaId = area.id,
+            depositAmount = area.depositAmount?.toString() ?: form.depositAmount,
+            bonusAmount = area.bonusAmount?.toString() ?: form.bonusAmount,
+            totalPrice = area.totalPrice?.toString() ?: form.totalPrice,
+            meterArea = area.areaValue?.toString() ?: form.meterArea,
+            installmentCount = area.installmentCount?.toString() ?: form.installmentCount,
+            installmentAmount = area.installmentAmount?.toString() ?: form.installmentAmount,
+            installmentPeriod = area.installmentPeriod?.takeIf { it.isNotBlank() } ?: form.installmentPeriod,
+        )
+    }
+
     fun update(transform: (PreFileForm) -> PreFileForm) { form = transform(form) }
 
     fun save(onSaved: (String) -> Unit) {
@@ -379,6 +431,7 @@ open class PreFileEditViewModel(
 /** قدم‌های ثبت سریع فایل پیش‌فروش */
 enum class PreFileWizardStep(val title: String) {
     PROJECT("پروژه و واحد"),
+    AREA("انتخاب متراژ"),
     OWNER("مالک / سپارنده فایل"),
     PRICE("قیمت فایل"),
     RANK("رتبه در پروژه"),
@@ -407,11 +460,13 @@ class PreFileWizardViewModel(
     /** فهرست قدم‌ها بر اساس پیش‌فرض‌های پروژه‌ی انتخاب‌شده */
     fun steps(project: ProjectEntity?): List<PreFileWizardStep> = buildList {
         add(PreFileWizardStep.PROJECT)
+        // پروژه‌ای که چند متراژ دارد، انتخاب متراژ اجباری است
+        if (projectAreas.size >= 2) add(PreFileWizardStep.AREA)
         add(PreFileWizardStep.OWNER)
         add(PreFileWizardStep.PRICE)
         if (project?.hasRanking == true) add(PreFileWizardStep.RANK)
         add(PreFileWizardStep.SALE)
-        add(PreFileWizardStep.INSTALLMENT)
+        // اقساط و تاریخ تحویل دیگر از کاربر پرسیده نمی‌شوند؛ از پروژه می‌آیند
         add(PreFileWizardStep.STATUS)
     }
 
@@ -432,6 +487,8 @@ class PreFileWizardViewModel(
         stepError = when (currentStep()) {
             PreFileWizardStep.PROJECT ->
                 if (form.projectId.isBlank()) "ابتدا یک پروژه انتخاب کنید" else null
+            PreFileWizardStep.AREA ->
+                if (form.areaId.isBlank()) "یکی از متراژهای پروژه را انتخاب کنید" else null
             PreFileWizardStep.OWNER ->
                 if (form.ownerName.isBlank()) "نام مالک / سپارنده را وارد کنید" else null
             PreFileWizardStep.PRICE ->
@@ -520,6 +577,7 @@ class PreFileDetailViewModel(
     private val followUpRepository: FollowUpRepository,
     private val customerRepository: CustomerRepository,
     private val noteRepository: NoteRepository,
+    private val attachmentRepository: AttachmentRepository,
 ) : ViewModel() {
 
     private val preFileId = MutableStateFlow<String?>(null)
@@ -549,7 +607,22 @@ class PreFileDetailViewModel(
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    val attachments: StateFlow<List<AttachmentEntity>> = preFileId
+        .flatMapLatest { id ->
+            if (id == null) flowOf(emptyList())
+            else attachmentRepository.observeByOwner(Constants.ATTACH_PREFILE, id)
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
     fun setPreFileId(id: String) { preFileId.value = id }
+
+    fun saveAttachment(attachment: AttachmentEntity) {
+        viewModelScope.launch { attachmentRepository.save(attachment) }
+    }
+
+    fun deleteAttachment(attachment: AttachmentEntity) {
+        viewModelScope.launch { attachmentRepository.delete(attachment) }
+    }
 
     fun saveNote(note: NoteEntity, onSaved: () -> Unit) {
         viewModelScope.launch {

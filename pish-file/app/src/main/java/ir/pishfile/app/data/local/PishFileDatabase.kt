@@ -7,16 +7,20 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import ir.pishfile.app.core.Constants
+import ir.pishfile.app.data.local.dao.AttachmentDao
 import ir.pishfile.app.data.local.dao.CustomerDao
 import ir.pishfile.app.data.local.dao.FollowUpDao
 import ir.pishfile.app.data.local.dao.NoteDao
 import ir.pishfile.app.data.local.dao.PreFileDao
+import ir.pishfile.app.data.local.dao.ProjectAreaDao
 import ir.pishfile.app.data.local.dao.ProjectDao
 import ir.pishfile.app.data.local.dao.UnitDao
+import ir.pishfile.app.data.local.entity.AttachmentEntity
 import ir.pishfile.app.data.local.entity.CustomerEntity
 import ir.pishfile.app.data.local.entity.FollowUpEntity
 import ir.pishfile.app.data.local.entity.NoteEntity
 import ir.pishfile.app.data.local.entity.PreFileEntity
+import ir.pishfile.app.data.local.entity.ProjectAreaEntity
 import ir.pishfile.app.data.local.entity.ProjectEntity
 import ir.pishfile.app.data.local.entity.UnitEntity
 import kotlinx.coroutines.CoroutineScope
@@ -27,23 +31,27 @@ import java.util.UUID
 @Database(
     entities = [
         ProjectEntity::class,
+        ProjectAreaEntity::class,
         UnitEntity::class,
         PreFileEntity::class,
         FollowUpEntity::class,
         CustomerEntity::class,
         NoteEntity::class,
+        AttachmentEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 abstract class PishFileDatabase : RoomDatabase() {
 
     abstract fun projectDao(): ProjectDao
+    abstract fun projectAreaDao(): ProjectAreaDao
     abstract fun unitDao(): UnitDao
     abstract fun preFileDao(): PreFileDao
     abstract fun followUpDao(): FollowUpDao
     abstract fun customerDao(): CustomerDao
     abstract fun noteDao(): NoteDao
+    abstract fun attachmentDao(): AttachmentDao
 
     companion object {
         const val DB_NAME = "pishfile.db"
@@ -59,7 +67,7 @@ abstract class PishFileDatabase : RoomDatabase() {
                     DB_NAME
                 )
                     .addCallback(SeedCallback(context))
-                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4)
+                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                     .fallbackToDestructiveMigration()
                     .build()
                     .also { INSTANCE = it }
@@ -148,6 +156,61 @@ abstract class PishFileDatabase : RoomDatabase() {
 
                 db.execSQL("ALTER TABLE follow_ups ADD COLUMN customerId TEXT")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_follow_ups_customerId ON follow_ups(customerId)")
+            }
+        }
+
+        /**
+         * نسخه‌ی ۴ → ۵:
+         *  - جدول project_areas (متراژهای پروژه با شرایط مالی مخصوص هرکدام)
+         *  - جدول attachments (فایل/عکس/ویدیو متصل به فایل پیش‌فروش یا واحد)
+         *  - ستون approx_total_price روی projects (قیمت حدودی کل، مخصوص پروژه‌های سهامی)
+         *  - ستون‌های fileType و areaId روی pre_files
+         */
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS project_areas (
+                        id TEXT NOT NULL PRIMARY KEY,
+                        projectId TEXT NOT NULL,
+                        label TEXT NOT NULL,
+                        areaValue REAL,
+                        totalPrice INTEGER,
+                        depositAmount INTEGER,
+                        bonusAmount INTEGER,
+                        installmentCount INTEGER,
+                        installmentAmount INTEGER,
+                        installmentPeriod TEXT,
+                        sortIndex INTEGER NOT NULL DEFAULT 0,
+                        FOREIGN KEY(projectId) REFERENCES projects(id) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_project_areas_projectId ON project_areas(projectId)")
+
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS attachments (
+                        id TEXT NOT NULL PRIMARY KEY,
+                        ownerType TEXT NOT NULL,
+                        ownerId TEXT NOT NULL,
+                        displayName TEXT NOT NULL,
+                        mimeType TEXT NOT NULL,
+                        uri TEXT NOT NULL,
+                        sizeBytes INTEGER,
+                        createdAt INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_attachments_ownerType ON attachments(ownerType)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_attachments_ownerId ON attachments(ownerId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_attachments_owner ON attachments(ownerType, ownerId)")
+
+                db.execSQL("ALTER TABLE projects ADD COLUMN approx_total_price INTEGER")
+
+                db.execSQL("ALTER TABLE pre_files ADD COLUMN fileType TEXT")
+                db.execSQL("ALTER TABLE pre_files ADD COLUMN areaId TEXT")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_pre_files_areaId ON pre_files(areaId)")
             }
         }
 

@@ -83,6 +83,18 @@
   و اعلان در کانال «یادآوری پیگیری‌ها» نشان می‌دهد؛ با باز کردن اعلان، برنامه باز می‌شود.
 - لغو آلارم در `save` (غیر-PENDING) / `markDone` / `delete` — از طریق همان `requestCode` (hash شناسه).
 
+## پرداخت خودکار اقساط سررسیدشده (`core/`) — ۰.۵.۰
+
+- `InstallmentAutoPayer` — برای هر پروژه‌ای که `nextInstallmentDueDate <= امروز` باشد (و قسط و تعداد مانده داشته باشد): مبلغ قسط به `defaultDepositAmount` (واریزی) اضافه، `remainingInstallmentsCount` یکی کم و تاریخ سررسید خالی می‌شود
+- `InstallmentWorker` (`CoroutineWorker`) + `InstallmentAutoPayScheduler` — یک کار دوره‌ای ۲۴ ساعته WorkManager + یک کار فوری هنگام `Application.onCreate` (جبران اگر گوشی خاموش بوده)
+
+## متراژهای پروژه و پیوست‌ها — ۰.۵.۰
+
+- `project_areas` — هر متراژ: برچسب، متراژ، قیمت کل، واریزی، امتیاز، تعداد/مبلغ/دوره‌ی اقساط؛ ویرایش از صفحه‌ی ویرایش پروژه (همگام‌سازی: حذف قدیمی + درج جدید هنگام ذخیره)
+- هنگام ثبت فایل برای پروژه‌ای با **دو یا بیشتر** متراژ، قدم «انتخاب متراژ» نمایش داده می‌شود و شرایط آن متراژ روی فرم می‌نشیند (`PreFileEntity.areaId`)
+- `attachments` — `ownerType` (PREFILE/UNIT) + `ownerId`؛ URI با مجوز خوانش پایدار ذخیره می‌شود؛ پیش‌نمایش عکس/ویدیو با `ImageView`/`VideoView` و باز شدن سایر فایل‌ها با `ACTION_VIEW`
+- `PreFileEntity.fileType` — `READY` (فایل واحد آماده) / `PRESALE` (فایل پیش‌فروش)
+
 ## تاریخ شمسی
 
 هیچ کتابخانه‌ی خارجی استفاده نشده. تبدیل در `core/Formatters.kt` انجام می‌شود:

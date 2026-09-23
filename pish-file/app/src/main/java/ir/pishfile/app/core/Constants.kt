@@ -19,6 +19,17 @@ object Constants {
         else -> "قیمت متری"
     }
 
+    // ---------- نوع فایل ----------
+    const val FILE_TYPE_READY = "READY"         // فایل واحد آماده
+    const val FILE_TYPE_PRESALE = "PRESALE"     // فایل پیش‌فروش
+
+    fun fileTypeLabel(fileType: String?): String =
+        if (fileType == FILE_TYPE_READY) "واحد آماده" else "پیش‌فروش"
+
+    // ---------- پیوست (فایل / عکس / ویدیو) ----------
+    const val ATTACH_PREFILE = "PREFILE"
+    const val ATTACH_UNIT = "UNIT"
+
     // ---------- وضعیت پیش‌فروش (فایل) ----------
     const val PREFILE_DRAFT = "DRAFT"               // پیش‌نویس
     const val PREFILE_URGENT = "URGENT"             // فروش فوری

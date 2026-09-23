@@ -8,6 +8,7 @@ import androidx.compose.material.icons.filled.Apartment
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.EventNote
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.CenterAlignedTopAppBar
@@ -36,6 +37,7 @@ import ir.pishfile.app.ui.screens.customers.CustomerDetailScreen
 import ir.pishfile.app.ui.screens.customers.CustomerEditScreen
 import ir.pishfile.app.ui.screens.customers.CustomerListScreen
 import ir.pishfile.app.ui.screens.fast.FastScreen
+import ir.pishfile.app.ui.screens.fast.FileChoiceScreen
 import ir.pishfile.app.ui.screens.fast.QuickPickMode
 import ir.pishfile.app.ui.screens.fast.QuickPickScreen
 import ir.pishfile.app.ui.screens.followups.FollowUpsScreen
@@ -48,11 +50,15 @@ import ir.pishfile.app.ui.screens.projects.ProjectEditScreen
 import ir.pishfile.app.ui.screens.projects.ProjectListScreen
 import ir.pishfile.app.ui.screens.settings.SettingsScreen
 import ir.pishfile.app.ui.screens.units.UnitDetailScreen
+import ir.pishfile.app.ui.screens.units.UnitListScreen
 import ir.pishfile.app.ui.screens.units.UnitEditScreen
 
 /** مسیرهای برنامه */
 object Routes {
     const val FAST = "fast"
+
+    /** انتخاب نوع فایل جدید: واحد آماده یا پیش‌فروش */
+    const val FILE_CHOICE = "filechoice"
 
     const val PREFILES = "prefiles"
     const val PREFILE_NEW = "prefiles/new?projectId={projectId}&unitId={unitId}"
@@ -61,6 +67,9 @@ object Routes {
 
     /** «از کجا شروع کنیم؟» — انتخاب واحد/فایل قبل از ثبت */
     const val QUICK_PICK = "quickpick?mode={mode}&allowSkip={allowSkip}"
+
+    /** فهرست واحدها (بخش واحدهای آماده) */
+    const val UNIT_LIST = "units/list"
 
     const val CUSTOMERS = "customers"
     const val CUSTOMER_NEW = "customers/new?unitId={unitId}&preFileId={preFileId}"
@@ -86,8 +95,8 @@ object Routes {
     fun unitNew(projectId: String? = null) = "units/new?projectId=${projectId ?: ""}"
     fun preFile(id: String) = "prefile/$id"
     fun preFileEdit(id: String) = "prefile/$id/edit"
-    fun preFileNew(projectId: String? = null, unitId: String? = null) =
-        "prefiles/new?projectId=${projectId ?: ""}&unitId=${unitId ?: ""}"
+    fun preFileNew(projectId: String? = null, unitId: String? = null, fileType: String = "PRESALE") =
+        "prefiles/new?projectId=${projectId ?: ""}&unitId=${unitId ?: ""}&fileType=$fileType"
     fun quickPick(mode: String = "file", allowSkip: Boolean = false) =
         "quickpick?mode=$mode&allowSkip=$allowSkip"
     fun customerNew(unitId: String? = null, preFileId: String? = null) =
@@ -107,6 +116,7 @@ private val topLevelDestinations = listOf(
     TopLevelDestination(Routes.FAST, "سریع", Icons.Filled.Bolt),
     TopLevelDestination(Routes.PREFILES, "فایل‌ها", Icons.Filled.Description),
     TopLevelDestination(Routes.PROJECTS, "پروژه‌ها", Icons.Filled.Apartment),
+    TopLevelDestination(Routes.UNIT_LIST, "واحدها", Icons.Filled.Home),
     TopLevelDestination(Routes.CUSTOMERS, "مشتری‌ها", Icons.Filled.Person),
     TopLevelDestination(Routes.FOLLOWUPS, "پیگیری‌ها", Icons.Filled.EventNote),
 )
@@ -114,6 +124,8 @@ private val topLevelDestinations = listOf(
 private fun titleFor(route: String?): String = when {
     route == null -> "پیش‌فایل"
     route.startsWith(Routes.FAST) -> "پیش‌فایل"
+    route.startsWith(Routes.FILE_CHOICE) -> "فایل جدید"
+    route.startsWith(Routes.UNIT_LIST) -> "واحدها"
     route.startsWith(Routes.QUICK_PICK) -> "از کجا شروع کنیم؟"
     route.startsWith(Routes.CUSTOMERS) -> "مشتری‌ها"
     route.startsWith("customer/") -> "مشتری"
@@ -185,13 +197,16 @@ fun MainScreen() {
         floatingActionButton = {
             val fab: (@Composable () -> Unit)? = when (currentRoute) {
                 Routes.PREFILES -> {
-                    { AddFab("فایل جدید") { navController.navigate(Routes.quickPick("file")) } }
+                    { AddFab("فایل جدید") { navController.navigate(Routes.FILE_CHOICE) } }
                 }
                 Routes.CUSTOMERS -> {
                     { AddFab("مشتری جدید") { navController.navigate(Routes.quickPick("customer", allowSkip = true)) } }
                 }
                 Routes.PROJECTS -> {
                     { AddFab("پروژه جدید") { navController.navigate(Routes.PROJECT_NEW) } }
+                }
+                Routes.UNIT_LIST -> {
+                    { AddFab("واحد جدید") { navController.navigate(Routes.unitNew()) } }
                 }
                 Routes.FOLLOWUPS -> {
                     { AddFab("پیگیری جدید") { navController.navigate("${Routes.FOLLOWUPS}?new=1") } }
@@ -210,7 +225,7 @@ fun MainScreen() {
             // ---------- صفحه‌ی سریع (خانه) ----------
             composable(Routes.FAST) {
                 FastScreen(
-                    onNewFile = { navController.navigate(Routes.quickPick("file")) },
+                    onNewFile = { navController.navigate(Routes.FILE_CHOICE) },
                     onNewCustomer = { navController.navigate(Routes.quickPick("customer", allowSkip = true)) },
                     onNewFollowUp = { navController.navigate("${Routes.FOLLOWUPS}?new=1") },
                     onOpenFollowUps = { navController.navigate(Routes.FOLLOWUPS) },
@@ -220,29 +235,41 @@ fun MainScreen() {
                 )
             }
 
+            // ---------- انتخاب نوع فایل جدید: واحد آماده یا پیش‌فروش ----------
+            composable(Routes.FILE_CHOICE) {
+                FileChoiceScreen(
+                    onReadyUnit = { navController.navigate(Routes.quickPick("ready")) },
+                    onPresale = { navController.navigate(Routes.quickPick("presale")) },
+                    onBack = { navController.popBackStack() },
+                )
+            }
+
             // ---------- انتخاب واحد/فایل قبل از ثبت ----------
             composable(
                 Routes.QUICK_PICK,
                 arguments = listOf(
-                    navArgument("mode") { type = NavType.StringType; defaultValue = "file" },
+                    navArgument("mode") { type = NavType.StringType; defaultValue = "presale" },
                     navArgument("allowSkip") { type = NavType.StringType; defaultValue = "false" },
                 ),
             ) { entry ->
-                val mode = if (entry.arguments?.getString("mode") == "customer") {
-                    QuickPickMode.CUSTOMER
-                } else {
-                    QuickPickMode.FILE
+                val pickMode = when (entry.arguments?.getString("mode")) {
+                    "ready" -> QuickPickMode.READY_UNIT
+                    "customer" -> QuickPickMode.CUSTOMER
+                    else -> QuickPickMode.PRESALE
                 }
+                val fileType = if (pickMode == QuickPickMode.READY_UNIT) "READY" else "PRESALE"
                 val allowSkip = entry.arguments?.getString("allowSkip") == "true"
                 QuickPickScreen(
-                    mode = mode,
+                    mode = pickMode,
                     allowSkip = allowSkip,
                     onSkip = { navController.navigate(Routes.customerNew()) },
                     onPickUnit = { unitId, projectId ->
-                        if (mode == QuickPickMode.FILE) {
-                            navController.navigate(Routes.preFileNew(projectId = projectId, unitId = unitId))
-                        } else {
+                        if (pickMode == QuickPickMode.CUSTOMER) {
                             navController.navigate(Routes.customerNew(unitId = unitId))
+                        } else {
+                            navController.navigate(
+                                Routes.preFileNew(projectId = projectId, unitId = unitId, fileType = fileType)
+                            )
                         }
                     },
                     onPickPreFile = { preFileId ->
@@ -261,11 +288,13 @@ fun MainScreen() {
                 arguments = listOf(
                     navArgument("projectId") { type = NavType.StringType; defaultValue = "" },
                     navArgument("unitId") { type = NavType.StringType; defaultValue = "" },
+                    navArgument("fileType") { type = NavType.StringType; defaultValue = "PRESALE" },
                 ),
             ) { entry ->
                 PreFileWizardScreen(
                     initialProjectId = entry.arguments?.getString("projectId").orEmpty(),
                     initialUnitId = entry.arguments?.getString("unitId").orEmpty(),
+                    initialFileType = entry.arguments?.getString("fileType").orEmpty().ifBlank { "PRESALE" },
                     onBack = { navController.popBackStack() },
                     onSaved = { id -> navController.navigate(Routes.preFile(id)) },
                     onOpenProjects = { navController.navigate(Routes.PROJECTS) },
@@ -342,6 +371,11 @@ fun MainScreen() {
                     onBack = { navController.popBackStack() },
                     onSaved = { navController.popBackStack() },
                 )
+            }
+
+            // ---------- فهرست واحدها (بخش واحدهای آماده) ----------
+            composable(Routes.UNIT_LIST) {
+                UnitListScreen(onOpen = { id -> navController.navigate(Routes.unit(id)) })
             }
 
             // ---------- واحدها (از داخل پروژه‌ها و فایل‌ها) ----------

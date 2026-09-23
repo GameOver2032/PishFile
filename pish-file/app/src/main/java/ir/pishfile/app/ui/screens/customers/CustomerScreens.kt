@@ -43,6 +43,8 @@ import ir.pishfile.app.core.Formatters
 import ir.pishfile.app.data.local.entity.CustomerEntity
 import ir.pishfile.app.ui.AppViewModelProvider
 import ir.pishfile.app.ui.components.ConfirmDialog
+import ir.pishfile.app.ui.components.GameHeader
+import ir.pishfile.app.ui.components.GameStat
 import ir.pishfile.app.ui.components.DropdownField
 import ir.pishfile.app.ui.components.EmptyState
 import ir.pishfile.app.ui.components.FilterChipsRow
@@ -79,6 +81,13 @@ fun CustomerListScreen(
     val fileByPreFileId = preFileRows.associateBy { it.preFile.id }
 
     Column(Modifier.fillMaxSize()) {
+        GameHeader(
+            title = "مشتری‌ها",
+            emoji = "👥",
+            subtitle = "خریداران و طرف‌مذاکره‌ها",
+            stats = listOf(GameStat(Formatters.number(customers.size), "کل مشتری‌ها")),
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+        )
         SearchField(
             query = query,
             onQueryChange = {
@@ -196,6 +205,14 @@ fun CustomerEditScreen(
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         item {
+            GameHeader(
+                title = if (customerId == null) "مشتری جدید" else "ویرایش مشتری",
+                emoji = "👤",
+                subtitle = "خریدار یا طرف‌مذاکره‌ی فایل پیش‌فروش",
+            )
+        }
+
+        item {
             SectionCard(
                 title = if (customerId == null) "مشتری جدید" else "ویرایش مشتری",
                 subtitle = "خریدار یا طرف‌مذاکره‌ی فایل پیش‌فروش",
@@ -309,6 +326,15 @@ fun CustomerDetailScreen(
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         // --- سربرگ ---
+        item {
+            GameHeader(
+                title = c.name,
+                emoji = "👤",
+                subtitle = Constants.customerRoleLabel(c.role),
+                stats = listOf(GameStat(Formatters.number(followUps.size), "پیگیری")),
+            )
+        }
+
         item {
             SectionCard(
                 title = c.name,

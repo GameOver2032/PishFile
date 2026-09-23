@@ -32,6 +32,9 @@ import ir.pishfile.app.core.Formatters
 import ir.pishfile.app.data.local.entity.ProjectEntity
 import ir.pishfile.app.ui.AppViewModelProvider
 import ir.pishfile.app.ui.components.DropdownField
+import ir.pishfile.app.ui.components.GameHeader
+import ir.pishfile.app.ui.components.GameStat
+import ir.pishfile.app.ui.components.StatusChip
 import ir.pishfile.app.ui.components.EmptyState
 import ir.pishfile.app.ui.components.FormTextField
 import ir.pishfile.app.ui.components.InfoRow
@@ -57,6 +60,7 @@ import ir.pishfile.app.ui.viewmodel.PreFileWizardViewModel
 fun PreFileWizardScreen(
     initialProjectId: String,
     initialUnitId: String,
+    initialFileType: String = Constants.FILE_TYPE_PRESALE,
     onBack: () -> Unit,
     onSaved: (String) -> Unit,
     onOpenProjects: () -> Unit,
@@ -65,6 +69,7 @@ fun PreFileWizardScreen(
     viewModel.startNew(
         initialProjectId.takeIf { it.isNotBlank() },
         initialUnitId.takeIf { it.isNotBlank() },
+        initialFileType,
     )
 
     if (!viewModel.isLoaded) {
@@ -109,7 +114,21 @@ fun PreFileWizardScreen(
             .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        // --- نوار خلاصه: شماره فایل + پروژه/واحد + قیمت کل زنده ---
+        // --- هدر بازی‌گونه ثبت فایل ---
+        GameHeader(
+            title = "ثبت فایل جدید",
+            emoji = if (form.fileType == Constants.FILE_TYPE_READY) "🏠" else "📄",
+            subtitle = Constants.fileTypeLabel(form.fileType),
+            stats = listOf(
+                GameStat(form.draftNumber, "شماره فایل"),
+                GameStat(
+                    if (form.computedTotal > 0) Formatters.amountShort(form.computedTotal) else "—",
+                    "قیمت کل (تومان)",
+                ),
+            ),
+        )
+
+        // --- نوار خلاصه: پروژه/واحد + قیمت کل زنده ---
         Card(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             shape = RoundedCornerShape(16.dp),
@@ -178,6 +197,7 @@ fun PreFileWizardScreen(
         ) {
             when (step) {
                 PreFileWizardStep.PROJECT -> WizardStepProject(viewModel, form)
+                PreFileWizardStep.AREA -> WizardStepArea(viewModel, form)
                 PreFileWizardStep.OWNER -> WizardStepOwner(viewModel, form)
                 PreFileWizardStep.PRICE -> WizardStepPrice(viewModel, form)
                 PreFileWizardStep.RANK -> WizardStepRank(viewModel, form)
@@ -227,6 +247,8 @@ fun PreFileWizardScreen(
 private fun stepSubtitle(step: PreFileWizardStep, project: ProjectEntity?): String? = when (step) {
     PreFileWizardStep.PROJECT ->
         "با انتخاب پروژه، شرایط اختصاصی آن به‌صورت خودکار پر می‌شود"
+    PreFileWizardStep.AREA ->
+        "هر متراژ شرایط مالی مخصوص خودش را دارد؛ با انتخاب متراژ، واریزی، امتیاز و اقساط آن پر می‌شود"
     PreFileWizardStep.OWNER ->
         "فقط اطلاعات مالک این فایل مورد نیاز است"
     PreFileWizardStep.PRICE ->
@@ -274,6 +296,53 @@ private fun WizardStepProject(viewModel: PreFileWizardViewModel, form: PreFileFo
     SpacerH(8)
     InfoRow("شماره فایل (خودکار)", form.draftNumber)
     InfoRow("تاریخ ثبت", Formatters.toPersianDigits(form.draftDate))
+}
+
+// ---------------------------------------------------------------------------
+// قدم: انتخاب متراژ (فقط برای پروژه‌های چند متراژ)
+// ---------------------------------------------------------------------------
+@Composable
+private fun WizardStepArea(viewModel: PreFileWizardViewModel, form: PreFileForm) {
+    val areas = viewModel.projectAreas
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        areas.forEach { area ->
+            val selected = form.areaId == area.id
+            Card(
+                onClick = { viewModel.selectArea(area.id) },
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = if (selected) MaterialTheme.colorScheme.primaryContainer
+                    else MaterialTheme.colorScheme.surface
+                ),
+                shape = RoundedCornerShape(14.dp),
+            ) {
+                Column(Modifier.padding(12.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(
+                            area.label,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        if (selected) {
+                            StatusChip("انتخاب شد", MaterialTheme.colorScheme.primary)
+                        }
+                    }
+                    SpacerH(6)
+                    Text(
+                        listOfNotNull(
+                            area.areaValue?.let { "${Formatters.number(it.toInt())} م²" },
+                            area.totalPrice?.let { "قیمت کل: ${Formatters.amountShort(it)} تومان" },
+                            area.depositAmount?.let { "واریزی: ${Formatters.amountShort(it)}" },
+                            area.bonusAmount?.let { "امتیاز: ${Formatters.amountShort(it)}" },
+                            area.installmentCount?.let { "اقساط: ${Formatters.number(it)}" },
+                        ).joinToString(" • "),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -534,11 +603,10 @@ private fun WizardStepStatus(viewModel: PreFileWizardViewModel, form: PreFileFor
         },
     )
     SpacerH(8)
-    JalaliDateField(
-        value = form.deliveryDate,
-        onValueChange = { v -> viewModel.update { it.copy(deliveryDate = v) } },
-        label = "تاریخ تقریبی تحویل واحد",
-        quickMonths = listOf(6, 12),
+    Text(
+        "تاریخ تحویل و اقساط از خودِ پروژه می‌آید و در این مرحله پرسیده نمی‌شود.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
     SpacerH(8)
     FormTextField(

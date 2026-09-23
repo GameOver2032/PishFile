@@ -38,9 +38,12 @@ import ir.pishfile.app.core.Constants
 import ir.pishfile.app.core.Formatters
 import ir.pishfile.app.data.local.entity.UnitEntity
 import ir.pishfile.app.ui.AppViewModelProvider
+import ir.pishfile.app.ui.components.AttachmentSection
 import ir.pishfile.app.ui.components.ConfirmDialog
 import ir.pishfile.app.ui.components.DropdownField
 import ir.pishfile.app.ui.components.EmptyState
+import ir.pishfile.app.ui.components.GameHeader
+import ir.pishfile.app.ui.components.GameStat
 import ir.pishfile.app.ui.components.FilterChipsRow
 import ir.pishfile.app.ui.components.FormTextField
 import ir.pishfile.app.ui.components.InfoRow
@@ -124,6 +127,13 @@ fun UnitEditScreen(
         contentPadding = PaddingValues(12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
+        item {
+            GameHeader(
+                title = if (unitId == null) "واحد جدید" else "ویرایش واحد",
+                emoji = "🏠",
+                subtitle = "مشخصات واحد و قیمت‌گذاری",
+            )
+        }
         item {
             SectionCard(title = "شناسه واحد") {
                 DropdownField(
@@ -361,6 +371,7 @@ fun UnitDetailScreen(
     val unit by viewModel.unit.collectAsStateWithLifecycle()
     val project by viewModel.project.collectAsStateWithLifecycle()
     val preFiles by viewModel.preFiles.collectAsStateWithLifecycle()
+    val attachments by viewModel.attachments.collectAsStateWithLifecycle()
     var showDelete by remember { mutableStateOf(false) }
 
     val current = unit ?: return
@@ -370,6 +381,21 @@ fun UnitDetailScreen(
         contentPadding = PaddingValues(12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
+        item {
+            GameHeader(
+                title = current.displayTitle,
+                emoji = "🏠",
+                subtitle = project?.name,
+                stats = listOf(
+                    GameStat(Formatters.number(current.grossArea?.toInt()), "متراژ (م²)"),
+                    GameStat(
+                        if ((current.totalPrice ?: 0L) > 0) Formatters.amountShort(current.totalPrice ?: 0L) else "—",
+                        "قیمت کل (تومان)",
+                    ),
+                ),
+            )
+        }
+
         item {
             SectionCard(
                 title = current.displayTitle,
@@ -431,6 +457,21 @@ fun UnitDetailScreen(
                 Button(onClick = onNewPreFile, modifier = Modifier.fillMaxWidth()) {
                     Text("ثبت پیش‌فروش برای این واحد")
                 }
+            }
+        }
+
+        item {
+            SectionCard(
+                title = "پیوست‌ها",
+                subtitle = "فایل، عکس و ویدیوی مرتبط با این واحد",
+            ) {
+                AttachmentSection(
+                    ownerType = Constants.ATTACH_UNIT,
+                    ownerId = current.id,
+                    attachments = attachments,
+                    onAdd = { viewModel.saveAttachment(it) },
+                    onDelete = { viewModel.deleteAttachment(it) },
+                )
             }
         }
 

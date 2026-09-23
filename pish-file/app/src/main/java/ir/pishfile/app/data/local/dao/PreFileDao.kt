@@ -17,6 +17,7 @@ data class PreFileRow(
     val unitTitle: String?,
     val projectPricingModel: String?,
     val projectDefaultDeposit: Long?,
+    val areaLabel: String? = null,
 )
 
 @Dao
@@ -43,10 +44,12 @@ interface PreFileDao {
                    CASE WHEN u.id IS NULL THEN NULL
                         ELSE (COALESCE(u.block || ' - ', '') || 'واحد ' || u.unitNumber ||
                               CASE WHEN u.floor IS NOT NULL THEN ' (طبقه ' || u.floor || ')' ELSE '' END)
-                   END AS unitTitle
+                   END AS unitTitle,
+                   a.label AS areaLabel
             FROM pre_files p
             LEFT JOIN projects pr ON pr.id = p.projectId
             LEFT JOIN units u ON u.id = p.unitId
+            LEFT JOIN project_areas a ON a.id = p.areaId
             WHERE p.deletedAt IS NULL
         """
     }

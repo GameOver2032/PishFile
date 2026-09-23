@@ -2,12 +2,15 @@ package ir.pishfile.app.di
 
 import android.content.Context
 import ir.pishfile.app.core.BackupManager
+import ir.pishfile.app.core.InstallmentAutoPayer
 import ir.pishfile.app.core.ReminderScheduler
 import ir.pishfile.app.data.local.PishFileDatabase
+import ir.pishfile.app.data.repository.AttachmentRepository
 import ir.pishfile.app.data.repository.CustomerRepository
 import ir.pishfile.app.data.repository.FollowUpRepository
 import ir.pishfile.app.data.repository.NoteRepository
 import ir.pishfile.app.data.repository.PreFileRepository
+import ir.pishfile.app.data.repository.ProjectAreaRepository
 import ir.pishfile.app.data.repository.ProjectRepository
 import ir.pishfile.app.data.repository.SettingsRepository
 import ir.pishfile.app.data.repository.UnitRepository
@@ -15,14 +18,17 @@ import ir.pishfile.app.data.repository.UnitRepository
 interface AppContainer {
     val database: PishFileDatabase
     val projectRepository: ProjectRepository
+    val projectAreaRepository: ProjectAreaRepository
     val unitRepository: UnitRepository
     val preFileRepository: PreFileRepository
     val followUpRepository: FollowUpRepository
     val customerRepository: CustomerRepository
     val noteRepository: NoteRepository
+    val attachmentRepository: AttachmentRepository
     val settingsRepository: SettingsRepository
     val backupManager: BackupManager
     val reminderScheduler: ReminderScheduler
+    val installmentAutoPayer: InstallmentAutoPayer
 }
 
 class DefaultAppContainer(private val context: Context) : AppContainer {
@@ -33,6 +39,18 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
 
     override val projectRepository: ProjectRepository by lazy {
         ProjectRepository(database.projectDao())
+    }
+
+    override val projectAreaRepository: ProjectAreaRepository by lazy {
+        ProjectAreaRepository(database.projectAreaDao())
+    }
+
+    override val attachmentRepository: AttachmentRepository by lazy {
+        AttachmentRepository(database.attachmentDao())
+    }
+
+    override val installmentAutoPayer: InstallmentAutoPayer by lazy {
+        InstallmentAutoPayer(projectRepository)
     }
 
     override val unitRepository: UnitRepository by lazy {

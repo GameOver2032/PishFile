@@ -28,10 +28,16 @@ import java.util.UUID
             parentColumns = ["id"],
             childColumns = ["unitId"],
             onDelete = ForeignKey.SET_NULL
+        ),
+        ForeignKey(
+            entity = ProjectAreaEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["areaId"],
+            onDelete = ForeignKey.SET_NULL
         )
     ],
     indices = [
-        Index("projectId"), Index("unitId"),
+        Index("projectId"), Index("unitId"), Index("areaId"),
         Index("status"), Index("draftNumber"), Index("remoteId"), Index("syncState")
     ]
 )
@@ -53,6 +59,17 @@ data class PreFileEntity(
 
     @ColumnInfo(name = "unitId")
     val unitId: String? = null,
+
+    /**
+     * نوع فایل: READY (فایل واحد آماده) یا PRESALE (فایل پیش‌فروش).
+     * مقادیر قدیمی (null) به‌عنوان PRESALE در نظر گرفته می‌شوند.
+     */
+    @ColumnInfo(name = "fileType")
+    val fileType: String? = null,
+
+    /** متراژ انتخاب‌شده از میان متراژهای پروژه (با شرایط مالی مخصوص به خودش) */
+    @ColumnInfo(name = "areaId")
+    val areaId: String? = null,
 
     /** مشخصات مالک / سپارنده‌ی فایل */
     @ColumnInfo(name = "ownerName")

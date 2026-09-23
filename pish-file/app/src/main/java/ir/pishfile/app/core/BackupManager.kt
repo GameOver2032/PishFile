@@ -8,7 +8,9 @@ import ir.pishfile.app.data.local.PishFileDatabase
 import ir.pishfile.app.data.local.entity.CustomerEntity
 import ir.pishfile.app.data.local.entity.FollowUpEntity
 import ir.pishfile.app.data.local.entity.NoteEntity
+import ir.pishfile.app.data.local.entity.AttachmentEntity
 import ir.pishfile.app.data.local.entity.PreFileEntity
+import ir.pishfile.app.data.local.entity.ProjectAreaEntity
 import ir.pishfile.app.data.local.entity.ProjectEntity
 import ir.pishfile.app.data.local.entity.UnitEntity
 import org.json.JSONArray
@@ -30,7 +32,7 @@ class BackupManager(
     suspend fun exportFullBackup(): File {
         val root = JSONObject()
         root.put("app", "PishFile")
-        root.put("version", 4)
+        root.put("version", 5)
         root.put("exportedAt", System.currentTimeMillis())
 
         root.put("projects", JSONArray(database.projectDao().getAll().map { projectToJson(it) }))
@@ -39,6 +41,8 @@ class BackupManager(
         root.put("followUps", JSONArray(database.followUpDao().getAll().map { followUpToJson(it) }))
         root.put("customers", JSONArray(database.customerDao().getAll().map { customerToJson(it) }))
         root.put("notes", JSONArray(database.noteDao().getAll().map { noteToJson(it) }))
+        root.put("projectAreas", JSONArray(database.projectAreaDao().getAll().map { projectAreaToJson(it) }))
+        root.put("attachments", JSONArray(database.attachmentDao().getAll().map { attachmentToJson(it) }))
 
         val file = File(exportDir(), "pishfile-backup-${timestamp()}.json")
         file.writeText(root.toString(2), Charsets.UTF_8)
@@ -140,6 +144,16 @@ class BackupManager(
             for (i in 0 until array.length()) {
                 database.noteDao().insert(jsonToNote(array.getJSONObject(i)))
                 notes++
+            }
+        }
+        root.optJSONArray("projectAreas")?.let { array ->
+            for (i in 0 until array.length()) {
+                database.projectAreaDao().insert(jsonToProjectArea(array.getJSONObject(i)))
+            }
+        }
+        root.optJSONArray("attachments")?.let { array ->
+            for (i in 0 until array.length()) {
+                database.attachmentDao().insert(jsonToAttachment(array.getJSONObject(i)))
             }
         }
 
@@ -381,5 +395,54 @@ class BackupManager(
         noteDate = o.optString("noteDate", Formatters.todayJalali()),
         createdAt = o.optLong("createdAt", System.currentTimeMillis()),
         updatedAt = o.optLong("updatedAt", System.currentTimeMillis()),
+    )    private fun projectAreaToJson(a: ProjectAreaEntity) = JSONObject().apply {
+        put("id", a.id)
+        put("projectId", a.projectId)
+        put("label", a.label)
+        a.areaValue?.let { put("areaValue", it) }
+        a.totalPrice?.let { put("totalPrice", it) }
+        a.depositAmount?.let { put("depositAmount", it) }
+        a.bonusAmount?.let { put("bonusAmount", it) }
+        a.installmentCount?.let { put("installmentCount", it) }
+        a.installmentAmount?.let { put("installmentAmount", it) }
+        a.installmentPeriod?.let { put("installmentPeriod", it) }
+        put("sortIndex", a.sortIndex)
+    }
+
+    private fun jsonToProjectArea(o: JSONObject) = ProjectAreaEntity(
+        id = o.getString("id"),
+        projectId = o.getString("projectId"),
+        label = o.getString("label"),
+        areaValue = o.double("areaValue"),
+        totalPrice = o.long("totalPrice"),
+        depositAmount = o.long("depositAmount"),
+        bonusAmount = o.long("bonusAmount"),
+        installmentCount = o.int("installmentCount"),
+        installmentAmount = o.long("installmentAmount"),
+        installmentPeriod = o.text("installmentPeriod"),
+        sortIndex = o.optInt("sortIndex"),
     )
+
+    private fun attachmentToJson(a: AttachmentEntity) = JSONObject().apply {
+        put("id", a.id)
+        put("ownerType", a.ownerType)
+        put("ownerId", a.ownerId)
+        put("displayName", a.displayName)
+        put("mimeType", a.mimeType)
+        put("uri", a.uri)
+        a.sizeBytes?.let { put("sizeBytes", it) }
+        put("createdAt", a.createdAt)
+    }
+
+    private fun jsonToAttachment(o: JSONObject) = AttachmentEntity(
+        id = o.getString("id"),
+        ownerType = o.getString("ownerType"),
+        ownerId = o.getString("ownerId"),
+        displayName = o.getString("displayName"),
+        mimeType = o.optString("mimeType", "application/octet-stream"),
+        uri = o.getString("uri"),
+        sizeBytes = o.long("sizeBytes"),
+        createdAt = o.optLong("createdAt", System.currentTimeMillis()),
+    )
+
 }
