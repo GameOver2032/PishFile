@@ -878,7 +878,7 @@ private fun AreasEditor(
                             decimal = true,
                             modifier = Modifier.weight(1f),
                         )
-                        FormTextField(
+                        ir.pishfile.app.ui.components.FormTextField(
                             value = area.label,
                             onValueChange = { v -> onItemChange(area.id) { it.copy(label = v) } },
                             label = "برچسب (اختیاری)",

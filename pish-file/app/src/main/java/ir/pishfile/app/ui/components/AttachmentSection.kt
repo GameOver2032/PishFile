@@ -2,7 +2,6 @@ package ir.pishfile.app.ui.components
 
 import android.content.Context
 import android.content.Intent
-import android.widget.MediaController
 import android.net.Uri
 import android.provider.OpenableColumns
 import android.widget.ImageView
@@ -219,15 +218,14 @@ private fun AttachmentPreviewDialog(
             ) {
                 AndroidView(
                     modifier = Modifier.fillMaxSize(),
-                    factory = { context ->
+                    factory = { ctx ->
                         if (attachment.isVideo) {
-                            VideoView(context).apply {
-                                setMediaController(MediaController(context, this))
-                                setVideoURI(Uri.parse(attachment.uri))
-                                setOnPreparedListener { it.start() }
-                            }
+                            val videoView = VideoView(ctx)
+                            videoView.setVideoURI(Uri.parse(attachment.uri))
+                            videoView.setOnPreparedListener { it.start() }
+                            videoView
                         } else {
-                            ImageView(context).apply {
+                            ImageView(ctx).apply {
                                 scaleType = ImageView.ScaleType.FIT_CENTER
                                 setImageURI(Uri.parse(attachment.uri))
                             }
