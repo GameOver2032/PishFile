@@ -395,7 +395,9 @@ class BackupManager(
         noteDate = o.optString("noteDate", Formatters.todayJalali()),
         createdAt = o.optLong("createdAt", System.currentTimeMillis()),
         updatedAt = o.optLong("updatedAt", System.currentTimeMillis()),
-    )    private fun projectAreaToJson(a: ProjectAreaEntity) = JSONObject().apply {
+    )
+
+    private fun projectAreaToJson(a: ProjectAreaEntity) = JSONObject().apply {
         put("id", a.id)
         put("projectId", a.projectId)
         put("label", a.label)

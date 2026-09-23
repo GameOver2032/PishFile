@@ -2,7 +2,7 @@ package ir.pishfile.app.ui.components
 
 import android.content.Context
 import android.content.Intent
-import android.media.MediaController
+import android.widget.MediaController
 import android.net.Uri
 import android.provider.OpenableColumns
 import android.widget.ImageView

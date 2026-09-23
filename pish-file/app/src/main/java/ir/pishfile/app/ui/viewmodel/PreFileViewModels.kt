@@ -450,7 +450,8 @@ class PreFileWizardViewModel(
     repository: PreFileRepository,
     projectRepository: ProjectRepository,
     unitRepository: UnitRepository,
-) : PreFileEditViewModel(repository, projectRepository, unitRepository) {
+    projectAreaRepository: ProjectAreaRepository,
+) : PreFileEditViewModel(repository, projectRepository, unitRepository, projectAreaRepository) {
 
     var currentStepIndex by mutableStateOf(0)
         private set
