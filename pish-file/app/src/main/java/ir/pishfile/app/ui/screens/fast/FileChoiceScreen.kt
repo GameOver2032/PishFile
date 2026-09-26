@@ -42,7 +42,7 @@ fun FileChoiceScreen(
         GameButton(
             emoji = "🏠",
             title = "واحد آماده",
-            subtitle = "فایل برای واحدی که آماده و قابل تحویل است",
+            subtitle = "فایل فروش برای واحد آماده — مستقیم فرم ثبت را پر می‌کنید",
             gradient = listOf(Color(0xFF1B5E20), Color(0xFF43A047)),
             onClick = onReadyUnit,
         )
@@ -50,7 +50,7 @@ fun FileChoiceScreen(
         GameButton(
             emoji = "🏗️",
             title = "پیش‌فروش",
-            subtitle = "فایل برای واحد در حال ساخت یا پروژه",
+            subtitle = "فایل پیش‌فروش — ابتدا پروژه را انتخاب می‌کنید",
             gradient = listOf(Color(0xFF283593), Color(0xFF5C6BC0)),
             onClick = onPresale,
         )

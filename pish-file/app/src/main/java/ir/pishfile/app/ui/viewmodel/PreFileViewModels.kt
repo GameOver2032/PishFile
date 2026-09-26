@@ -262,11 +262,12 @@ open class PreFileEditViewModel(
         if (isLoaded) return
         viewModelScope.launch {
             projects = projectRepository.getAll()
-            // اگر واحد مشخص شد ولی پروژه نه، پروژه از خودِ واحد گرفته می‌شود
+            // اگر واحد مشخص شد ولی پروژه نه، پروژه از خودِ واحد گرفته می‌شود؛
+            // در غیر این صورت پروژه خالی می‌ماند تا کاربر خودش انتخاب کند
             val givenUnit = unitId?.takeIf { it.isNotBlank() }?.let { unitRepository.getById(it) }
             val defaultProject = projectId?.takeIf { it.isNotBlank() }
                 ?: givenUnit?.projectId
-                ?: projects.firstOrNull()?.id.orEmpty()
+                ?: ""
 
             availableUnits = unitRepository.getByProject(defaultProject)
             selectedUnit = givenUnit

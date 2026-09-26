@@ -48,6 +48,7 @@ import ir.pishfile.app.ui.screens.prefiles.PreFileWizardScreen
 import ir.pishfile.app.ui.screens.projects.ProjectDetailScreen
 import ir.pishfile.app.ui.screens.projects.ProjectEditScreen
 import ir.pishfile.app.ui.screens.projects.ProjectListScreen
+import ir.pishfile.app.ui.screens.projects.ProjectPickScreen
 import ir.pishfile.app.ui.screens.settings.SettingsScreen
 import ir.pishfile.app.ui.screens.units.UnitDetailScreen
 import ir.pishfile.app.ui.screens.units.UnitListScreen
@@ -59,6 +60,9 @@ object Routes {
 
     /** انتخاب نوع فایل جدید: واحد آماده یا پیش‌فروش */
     const val FILE_CHOICE = "filechoice"
+
+    /** انتخاب پروژه هنگام ثبت فایل پیش‌فروش */
+    const val PROJECT_PICK = "projectpick"
 
     const val PREFILES = "prefiles"
     const val PREFILE_NEW = "prefiles/new?projectId={projectId}&unitId={unitId}"
@@ -238,8 +242,19 @@ fun MainScreen() {
             // ---------- انتخاب نوع فایل جدید: واحد آماده یا پیش‌فروش ----------
             composable(Routes.FILE_CHOICE) {
                 FileChoiceScreen(
-                    onReadyUnit = { navController.navigate(Routes.quickPick("ready")) },
-                    onPresale = { navController.navigate(Routes.quickPick("presale")) },
+                    onReadyUnit = { navController.navigate(Routes.preFileNew(fileType = "READY")) },
+                    onPresale = { navController.navigate(Routes.PROJECT_PICK) },
+                    onBack = { navController.popBackStack() },
+                )
+            }
+
+            // ---------- انتخاب پروژه برای فایل پیش‌فروش ----------
+            composable(Routes.PROJECT_PICK) {
+                ProjectPickScreen(
+                    onPickProject = { projectId ->
+                        navController.navigate(Routes.preFileNew(projectId = projectId, fileType = "PRESALE"))
+                    },
+                    onNewProject = { navController.navigate(Routes.PROJECT_NEW) },
                     onBack = { navController.popBackStack() },
                 )
             }
@@ -401,7 +416,7 @@ fun MainScreen() {
                     unitId = unitId,
                     onBack = { navController.popBackStack() },
                     onEdit = { navController.navigate(Routes.unitEdit(unitId)) },
-                    onNewPreFile = { navController.navigate(Routes.preFileNew(unitId = unitId)) },
+                    onNewPreFile = { navController.navigate(Routes.preFileNew(unitId = unitId, fileType = "READY")) },
                     onOpenPreFile = { id -> navController.navigate(Routes.preFile(id)) },
                 )
             }
