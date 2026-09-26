@@ -98,7 +98,7 @@ class SettingsViewModel(
         viewModelScope.launch {
             try {
                 val summary = withContext(Dispatchers.IO) { backupManager.importFullBackup(json) }
-                _message.value = "بازیابی کامل شد: ${Formatters.toPersianDigits(summary.total)} رکورد"
+                _message.value = "بازیابی کامل شد: ${Formatters.toPersianDigits(summary.total.toString())} رکورد"
                 refreshPending()
             } catch (e: Exception) {
                 _message.value = "خطا در بازیابی: ${e.message}"
@@ -122,8 +122,8 @@ class SettingsViewModel(
         viewModelScope.launch {
             try {
                 val (projects, areas) = withContext(Dispatchers.IO) { backupManager.importProjectsBackup(json) }
-                _message.value = "بازیابی پروژه‌ها: ${Formatters.toPersianDigits(projects)} پروژه، " +
-                    "${Formatters.toPersianDigits(areas)} متراژ"
+                _message.value = "بازیابی پروژه‌ها: ${Formatters.toPersianDigits(projects.toString())} پروژه، " +
+                    "${Formatters.toPersianDigits(areas.toString())} متراژ"
                 refreshPending()
             } catch (e: Exception) {
                 _message.value = "خطا در بازیابی پروژه‌ها: ${e.message}"
@@ -147,7 +147,7 @@ class SettingsViewModel(
         viewModelScope.launch {
             try {
                 val units = withContext(Dispatchers.IO) { backupManager.importUnitsBackup(json) }
-                _message.value = "بازیابی واحدها: ${Formatters.toPersianDigits(units)} واحد"
+                _message.value = "بازیابی واحدها: ${Formatters.toPersianDigits(units.toString())} واحد"
                 refreshPending()
             } catch (e: Exception) {
                 _message.value = "خطا در بازیابی واحدها: ${e.message}"
