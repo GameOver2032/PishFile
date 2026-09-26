@@ -21,7 +21,7 @@ import java.util.UUID
         )
     ],
     indices = [
-        Index("preFileId"), Index("dueDate"), Index("status"), Index("syncState")
+        Index("preFileId"), Index("customerId"), Index("dueDate"), Index("status"), Index("syncState")
     ]
 )
 data class FollowUpEntity(
@@ -76,6 +76,10 @@ data class FollowUpEntity(
     /** شماره تماس */
     @ColumnInfo(name = "contactPhone")
     val contactPhone: String? = null,
+
+    /** مشتری مربوطه (در صورت وجود) — برای پیگیری‌های مستقیم با مشتری */
+    @ColumnInfo(name = "customerId")
+    val customerId: String? = null,
 
     @ColumnInfo(name = "remindDaysBefore")
     val remindDaysBefore: Int = 0,

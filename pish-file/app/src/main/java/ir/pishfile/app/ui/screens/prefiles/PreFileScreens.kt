@@ -42,20 +42,25 @@ import ir.pishfile.app.core.Constants
 import ir.pishfile.app.core.Formatters
 import ir.pishfile.app.data.local.entity.PreFileEntity
 import ir.pishfile.app.ui.AppViewModelProvider
+import ir.pishfile.app.ui.components.AttachmentSection
 import ir.pishfile.app.ui.components.ConfirmDialog
 import ir.pishfile.app.ui.components.DropdownField
 import ir.pishfile.app.ui.components.EmptyState
 import ir.pishfile.app.ui.components.FilterChipsRow
 import ir.pishfile.app.ui.components.FormTextField
+import ir.pishfile.app.ui.components.GameHeader
+import ir.pishfile.app.ui.components.GameStat
 import ir.pishfile.app.ui.components.InfoRow
 import ir.pishfile.app.ui.components.JalaliDateField
 import ir.pishfile.app.ui.components.MoneyField
+import ir.pishfile.app.ui.components.NoteDialog
+import ir.pishfile.app.ui.components.NoteTimelineCard
 import ir.pishfile.app.ui.components.NumberField
 import ir.pishfile.app.ui.components.SearchField
 import ir.pishfile.app.ui.components.SectionCard
 import ir.pishfile.app.ui.components.SpacerH
 import ir.pishfile.app.ui.components.StatusChip
-import ir.pishfile.app.ui.screens.dashboard.preFileStatusColor
+import ir.pishfile.app.ui.components.preFileStatusColor
 import ir.pishfile.app.ui.viewmodel.PreFileDetailViewModel
 import ir.pishfile.app.ui.viewmodel.PreFileEditViewModel
 import ir.pishfile.app.ui.viewmodel.PreFileListViewModel
@@ -73,15 +78,23 @@ fun PreFileListScreen(
     var pendingDelete by remember { mutableStateOf<PreFileEntity?>(null) }
 
     val preFiles by viewModel.preFiles.collectAsStateWithLifecycle()
+    val totalCount by viewModel.totalCount.collectAsStateWithLifecycle()
 
     Column(Modifier.fillMaxSize()) {
+        GameHeader(
+            title = "فایل‌ها",
+            emoji = "📄",
+            subtitle = "فایل‌های پیش‌فروش و واحدهای آماده",
+            stats = listOf(GameStat(Formatters.number(totalCount), "کل فایل‌ها")),
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+        )
         SearchField(
             query = query,
             onQueryChange = {
                 query = it
                 viewModel.setQuery(it)
             },
-            placeholder = "جست‌وجوی پیش‌فروش: شماره فایل، مالک، پروژه، واحد…",
+            placeholder = "جست‌وجوی فایل: شماره فایل، مالک، پروژه، واحد…",
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
         )
 
@@ -97,8 +110,8 @@ fun PreFileListScreen(
 
         if (preFiles.isEmpty()) {
             EmptyState(
-                title = "فایل پیش‌فروشی ثبت نشده",
-                subtitle = "با دکمه + یک فایل پیش‌فروش جدید اضافه کنید",
+                title = "فایلی ثبت نشده",
+                subtitle = "با دکمه + یک فایل جدید (واحد آماده یا پیش‌فروش) اضافه کنید",
                 icon = { Icon(Icons.Filled.Description, contentDescription = null) },
             )
         } else {
@@ -119,7 +132,7 @@ fun PreFileListScreen(
 
     pendingDelete?.let { preFile ->
         ConfirmDialog(
-            title = "حذف فایل پیش‌فروش",
+            title = if (preFile.fileType == Constants.FILE_TYPE_READY) "حذف فایل" else "حذف فایل پیش‌فروش",
             message = "فایل ${preFile.draftNumber} حذف شود؟",
             onConfirm = { viewModel.delete(preFile.id) },
             onDismiss = { pendingDelete = null },
@@ -151,6 +164,7 @@ private fun PreFileCard(
                     Text(
                         listOfNotNull(
                             row.unitTitle,
+                            row.areaLabel,
                             preFile.ownerName?.let { "مالک: $it" },
                             Formatters.toPersianDigits(preFile.draftDate)
                         ).joinToString(" • "),
@@ -159,6 +173,9 @@ private fun PreFileCard(
                     )
                 }
                 StatusChip(Constants.preFileStatusLabel(preFile.status), preFileStatusColor(preFile.status))
+                if (preFile.fileType == Constants.FILE_TYPE_READY) {
+                    StatusChip("واحد آماده", MaterialTheme.colorScheme.primary)
+                }
                 IconButton(onClick = onDelete) {
                     Icon(Icons.Filled.Delete, contentDescription = "حذف", tint = MaterialTheme.colorScheme.error)
                 }
@@ -175,7 +192,7 @@ private fun PreFileCard(
                             style = MaterialTheme.typography.labelSmall,
                         )
                         Text(
-                            "مجموع: ${Formatters.amountShort(preFile.computedTotal)} تومان",
+                            "قیمت کل: ${Formatters.amountShort(preFile.displayPrice)} تومان",
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary,
@@ -187,7 +204,7 @@ private fun PreFileCard(
                             style = MaterialTheme.typography.labelSmall,
                         )
                         Text(
-                            "کل: ${Formatters.amountShort(preFile.computedTotal)} تومان",
+                            "قیمت کل: ${Formatters.amountShort(preFile.displayPrice)} تومان",
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary,
@@ -199,7 +216,7 @@ private fun PreFileCard(
                             style = MaterialTheme.typography.labelSmall,
                         )
                         Text(
-                            "قیمت: ${Formatters.amountShort(preFile.displayPrice)} تومان",
+                            "قیمت کل: ${Formatters.amountShort(preFile.displayPrice)} تومان",
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary,
@@ -254,6 +271,13 @@ fun PreFileEditScreen(
         contentPadding = PaddingValues(12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
+        item {
+            GameHeader(
+                title = if (preFileId == null) "ثبت فایل" else "ویرایش فایل",
+                emoji = "📄",
+                subtitle = "فرم کامل ثبت / ویرایش فایل",
+            )
+        }
         // --- ۱) پروژه و واحد ---
         item {
             SectionCard(
@@ -364,7 +388,7 @@ fun PreFileEditScreen(
                         ) {
                             Column(Modifier.padding(12.dp)) {
                                 Text(
-                                    "مجموع پرداختی خریدار (واریزی + امتیاز):",
+                                    "قیمت کل (واریزی + امتیاز):",
                                     style = MaterialTheme.typography.bodySmall,
                                 )
                                 Text(
@@ -407,7 +431,7 @@ fun PreFileEditScreen(
                         ) {
                             Column(Modifier.padding(12.dp)) {
                                 Text(
-                                    "مبلغ کل سهام:",
+                                    "قیمت کل (مبلغ کل سهام):",
                                     style = MaterialTheme.typography.bodySmall,
                                 )
                                 Text(
@@ -441,7 +465,7 @@ fun PreFileEditScreen(
                         MoneyField(
                             value = form.totalPrice.ifBlank { form.computedTotal.toString() },
                             onValueChange = { v -> viewModel.update { it.copy(totalPrice = v) } },
-                            label = "مبلغ کل فایل",
+                            label = "قیمت کل فایل",
                             helperText = "از حاصل‌ضرب متراژ در قیمت هر متر محاسبه می‌شود",
                         )
                     }
@@ -563,7 +587,7 @@ fun PreFileEditScreen(
         item {
             SectionCard(title = "وضعیت فایل و تحویل") {
                 DropdownField(
-                    label = "وضعیت پیش‌فروش",
+                    label = if (form.fileType == Constants.FILE_TYPE_READY) "وضعیت فروش" else "وضعیت پیش‌فروش",
                     options = Constants.preFileStatuses.map { Constants.preFileStatusLabel(it) },
                     selected = Constants.preFileStatusLabel(form.status),
                     onSelect = { label ->
@@ -593,7 +617,7 @@ fun PreFileEditScreen(
             Button(
                 onClick = { viewModel.save { id -> onSaved(id) } },
                 modifier = Modifier.fillMaxWidth(),
-            ) { Text(if (preFileId == null) "ثبت فایل پیش‌فروش" else "ذخیره تغییرات") }
+            ) { Text(if (preFileId == null) "ثبت فایل" else "ذخیره تغییرات") }
         }
         item {
             OutlinedButton(onClick = onBack, modifier = Modifier.fillMaxWidth()) { Text("انصراف") }
@@ -610,15 +634,21 @@ fun PreFileDetailScreen(
     onBack: () -> Unit,
     onEdit: () -> Unit,
     onOpenUnit: (String) -> Unit,
+    onOpenCustomer: (String) -> Unit,
+    onNewCustomer: () -> Unit,
     viewModel: PreFileDetailViewModel = viewModel(factory = AppViewModelProvider.Factory),
 ) {
     viewModel.setPreFileId(preFileId)
 
     val row by viewModel.row.collectAsStateWithLifecycle()
     val unit by viewModel.unit.collectAsStateWithLifecycle()
+    val customers by viewModel.customers.collectAsStateWithLifecycle()
+    val notes by viewModel.notes.collectAsStateWithLifecycle()
+    val attachments by viewModel.attachments.collectAsStateWithLifecycle()
 
     var showDelete by remember { mutableStateOf(false) }
     var showStatusMenu by remember { mutableStateOf(false) }
+    var showNoteDialog by remember { mutableStateOf(false) }
 
     val currentRow = row ?: return
     val pf = currentRow.preFile
@@ -628,6 +658,21 @@ fun PreFileDetailScreen(
         contentPadding = PaddingValues(12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
+        item {
+            GameHeader(
+                title = pf.draftNumber,
+                emoji = if (pf.fileType == Constants.FILE_TYPE_READY) "🏠" else "📄",
+                subtitle = listOfNotNull(currentRow.projectName, currentRow.unitTitle).joinToString(" • "),
+                stats = listOf(
+                    GameStat(Constants.fileTypeLabel(pf.fileType), "نوع فایل"),
+                    GameStat(
+                        if (pf.displayPrice > 0) Formatters.amountShort(pf.displayPrice) else "—",
+                        "قیمت کل (تومان)",
+                    ),
+                ),
+            )
+        }
+
         item {
             SectionCard(
                 title = "${pf.draftNumber} • ${currentRow.projectName ?: "پروژه"}",
@@ -658,6 +703,8 @@ fun PreFileDetailScreen(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     StatusChip(Constants.preFileStatusLabel(pf.status), preFileStatusColor(pf.status))
                     SpacerH(0)
+                    StatusChip(Constants.fileTypeLabel(pf.fileType), MaterialTheme.colorScheme.secondary)
+                    SpacerH(0)
                     Text(
                         "  تاریخ ثبت: ${Formatters.toPersianDigits(pf.draftDate)}",
                         style = MaterialTheme.typography.labelMedium,
@@ -665,6 +712,7 @@ fun PreFileDetailScreen(
                     )
                 }
                 SpacerH(8)
+                currentRow.areaLabel?.let { InfoRow("متراژ انتخاب‌شده", it, emphasize = true) }
                 InfoRow("مالک / سپارنده", pf.ownerName)
                 InfoRow("شماره تماس", pf.ownerPhone)
                 InfoRow("مدل پروژه", Constants.projectPricingModelLabel(pf.pricingModel))
@@ -680,18 +728,18 @@ fun PreFileDetailScreen(
                     Constants.PRICING_DEPOSIT_BONUS -> {
                         InfoRow("مبلغ واریزی تا امروز", Formatters.amountWithUnit(pf.depositAmount))
                         InfoRow("مبلغ امتیاز (سود پروژه)", Formatters.amountWithUnit(pf.bonusAmount))
-                        InfoRow("مجموع پرداختی خرید (واریزی + امتیاز)", Formatters.amountWithUnit(pf.computedTotal), emphasize = true)
+                        InfoRow("قیمت کل (واریزی + امتیاز)", Formatters.amountWithUnit(pf.displayPrice), emphasize = true)
                     }
                     Constants.PRICING_SHARE -> {
                         InfoRow("متراژ هر سهم", pf.shareMeterArea?.let { "${Formatters.number(it.toInt())} م²" })
                         InfoRow("تعداد سهم", Formatters.number(pf.shareCount))
                         InfoRow("قیمت هر سهم", Formatters.amountWithUnit(pf.sharePrice))
-                        InfoRow("مبلغ کل سهام", Formatters.amountWithUnit(pf.computedTotal), emphasize = true)
+                        InfoRow("قیمت کل (مبلغ سهام)", Formatters.amountWithUnit(pf.displayPrice), emphasize = true)
                     }
                     else -> { // METER
                         InfoRow("متراژ", pf.meterArea?.let { "${Formatters.number(it.toInt())} م²" })
                         InfoRow("قیمت هر مترمربع", Formatters.amountWithUnit(pf.pricePerMeter))
-                        InfoRow("مبلغ کل فایل", Formatters.amountWithUnit(pf.displayPrice), emphasize = true)
+                        InfoRow("قیمت کل", Formatters.amountWithUnit(pf.displayPrice), emphasize = true)
                     }
                 }
             }
@@ -737,14 +785,135 @@ fun PreFileDetailScreen(
             }
         }
 
+        // --- مشتریان این فایل ---
+        item {
+            SectionCard(
+                title = "مشتریان این فایل",
+                subtitle = "طرف‌مذاکره‌هایی که روی این فایل پیگیری می‌کنید",
+                trailing = {
+                    OutlinedButton(onClick = onNewCustomer) { Text("مشتری جدید") }
+                },
+            ) {
+                if (customers.isEmpty()) {
+                    Text(
+                        "هنوز مشتری‌ای برای این فایل ثبت نشده",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        customers.forEach { customer ->
+                            Card(
+                                onClick = { onOpenCustomer(customer.id) },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                                shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
+                            ) {
+                                Row(
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .padding(10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Column(Modifier.weight(1f)) {
+                                        Text(
+                                            customer.name,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.Bold,
+                                        )
+                                        Text(
+                                            listOfNotNull(
+                                                customer.phone,
+                                                Constants.customerRoleLabel(customer.role),
+                                            ).joinToString(" • "),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                    StatusChip(
+                                        Constants.customerStatusLabel(customer.status),
+                                        if (customer.status == Constants.CUSTOMER_ACTIVE) MaterialTheme.colorScheme.primary
+                                        else MaterialTheme.colorScheme.secondary,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // --- مکالمات و نوت‌ها ---
+        item {
+            SectionCard(
+                title = "مکالمات و نوت‌ها",
+                subtitle = "تاریخچه‌ی پیگیری‌ها و نتیجه‌ی مکالمات",
+                trailing = {
+                    OutlinedButton(onClick = { showNoteDialog = true }) { Text("نوت جدید") }
+                },
+            ) {
+                if (notes.isEmpty()) {
+                    Text(
+                        "مکالمه‌ای ثبت نشده — با «نوت جدید» اولین مکالمه را ثبت کنید",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        notes.forEach { note ->
+                            NoteTimelineCard(
+                                note = note,
+                                contextLine = null,
+                                onDelete = { viewModel.deleteNote(note.id) },
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // --- پیوست‌ها: فایل، عکس و ویدیو ---
+        item {
+            SectionCard(
+                title = "پیوست‌ها",
+                subtitle = if (pf.fileType == Constants.FILE_TYPE_READY) {
+                    "فایل، عکس و ویدیوی مرتبط با این فایل"
+                } else {
+                    "فایل، عکس و ویدیوی مرتبط با این فایل پیش‌فروش"
+                },
+            ) {
+                AttachmentSection(
+                    ownerType = Constants.ATTACH_PREFILE,
+                    ownerId = pf.id,
+                    attachments = attachments,
+                    onAdd = { viewModel.saveAttachment(it) },
+                    onDelete = { viewModel.deleteAttachment(it) },
+                )
+            }
+        }
+
         item {
             OutlinedButton(onClick = onBack, modifier = Modifier.fillMaxWidth()) { Text("بازگشت") }
         }
     }
 
+    if (showNoteDialog) {
+        NoteDialog(
+            preFiles = emptyList(),
+            preFileIds = emptyList(),
+            customers = emptyList(),
+            customerIds = emptyList(),
+            fixedPreFileId = pf.id,
+            onDismiss = { showNoteDialog = false },
+            onSave = { note ->
+                viewModel.saveNote(note) { showNoteDialog = false }
+            },
+        )
+    }
+
     if (showDelete) {
         ConfirmDialog(
-            title = "حذف فایل پیش‌فروش",
+            title = if (pf.fileType == Constants.FILE_TYPE_READY) "حذف فایل" else "حذف فایل پیش‌فروش",
             message = "فایل ${pf.draftNumber} حذف شود؟",
             onConfirm = { viewModel.delete(onBack) },
             onDismiss = { showDelete = false },

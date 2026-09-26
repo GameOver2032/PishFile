@@ -8,8 +8,10 @@ import androidx.lifecycle.viewModelScope
 import ir.pishfile.app.core.Constants
 import ir.pishfile.app.core.Formatters
 import ir.pishfile.app.data.local.dao.PreFileRow
+import ir.pishfile.app.data.local.entity.AttachmentEntity
 import ir.pishfile.app.data.local.entity.ProjectEntity
 import ir.pishfile.app.data.local.entity.UnitEntity
+import ir.pishfile.app.data.repository.AttachmentRepository
 import ir.pishfile.app.data.repository.PreFileRepository
 import ir.pishfile.app.data.repository.ProjectRepository
 import ir.pishfile.app.data.repository.UnitRepository
@@ -231,6 +233,7 @@ class UnitDetailViewModel(
     private val unitRepository: UnitRepository,
     private val projectRepository: ProjectRepository,
     private val preFileRepository: PreFileRepository,
+    private val attachmentRepository: AttachmentRepository,
 ) : ViewModel() {
 
     private val unitId = MutableStateFlow<String?>(null)
@@ -252,7 +255,22 @@ class UnitDetailViewModel(
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    val attachments: StateFlow<List<AttachmentEntity>> = unitId
+        .flatMapLatest { id ->
+            if (id == null) flowOf(emptyList())
+            else attachmentRepository.observeByOwner(Constants.ATTACH_UNIT, id)
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
     fun setUnitId(id: String) { unitId.value = id }
+
+    fun saveAttachment(attachment: AttachmentEntity) {
+        viewModelScope.launch { attachmentRepository.save(attachment) }
+    }
+
+    fun deleteAttachment(attachment: AttachmentEntity) {
+        viewModelScope.launch { attachmentRepository.delete(attachment) }
+    }
 
     fun delete(onDone: () -> Unit) {
         val id = unitId.value ?: return

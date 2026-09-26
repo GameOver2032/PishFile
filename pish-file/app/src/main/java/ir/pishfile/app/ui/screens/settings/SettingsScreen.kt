@@ -19,16 +19,21 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import ir.pishfile.app.BuildConfig
 import ir.pishfile.app.core.Formatters
 import ir.pishfile.app.ui.AppViewModelProvider
 import ir.pishfile.app.ui.components.FormTextField
 import ir.pishfile.app.ui.components.InfoRow
+import ir.pishfile.app.ui.components.GameHeader
 import ir.pishfile.app.ui.components.SectionCard
 import ir.pishfile.app.ui.components.SoftDivider
 import ir.pishfile.app.ui.components.SpacerH
@@ -49,10 +54,22 @@ fun SettingsScreen(
     val pending by viewModel.pending.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
 
+    var restoreTarget by remember { mutableStateOf<RestoreTarget?>(null) }
     val importLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument(),
     ) { uri ->
-        uri?.let { viewModel.importBackup(it) }
+        val target = restoreTarget
+        restoreTarget = null
+        if (uri == null || target == null) return@rememberLauncherForActivityResult
+        val text = runCatching {
+            context.contentResolver.openInputStream(uri)?.use { it.readBytes().decodeToString() }
+        }.getOrNull()
+        if (text == null) return@rememberLauncherForActivityResult
+        when (target) {
+            RestoreTarget.FULL -> viewModel.importBackup(text)
+            RestoreTarget.PROJECTS -> viewModel.importProjectsBackup(text)
+            RestoreTarget.UNITS -> viewModel.importUnitsBackup(text)
+        }
     }
 
     LaunchedEffect(Unit) { viewModel.refreshPending() }
@@ -62,6 +79,13 @@ fun SettingsScreen(
         contentPadding = PaddingValues(12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
+        item {
+            GameHeader(
+                title = "تنظیمات",
+                emoji = "⚙️",
+                subtitle = "مدیریت برنامه، پشتیبان‌گیری و ظاهر",
+            )
+        }
         message?.let { text ->
             item {
                 Snackbar(
@@ -153,9 +177,46 @@ fun SettingsScreen(
                 ) { Text("پشتیبان‌گیری کامل (JSON)") }
                 SpacerH(8)
                 OutlinedButton(
-                    onClick = { importLauncher.launch(arrayOf("application/json", "*/*")) },
+                    onClick = {
+                        restoreTarget = RestoreTarget.FULL
+                        importLauncher.launch(arrayOf("application/json", "*/*"))
+                    },
                     modifier = Modifier.fillMaxWidth(),
-                ) { Text("بازیابی از فایل بکاپ") }
+                ) { Text("بازیابی کامل از فایل بکاپ") }
+                SpacerH(8)
+                OutlinedButton(
+                    onClick = {
+                        viewModel.exportProjectsBackup { intent ->
+                            context.startActivity(Intent.createChooser(intent, "خروجی پروژه‌ها"))
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text("خروجی JSON پروژه‌ها (با متراژها)") }
+                SpacerH(8)
+                OutlinedButton(
+                    onClick = {
+                        restoreTarget = RestoreTarget.PROJECTS
+                        importLauncher.launch(arrayOf("application/json", "*/*"))
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text("بازیابی پروژه‌ها از JSON") }
+                SpacerH(8)
+                OutlinedButton(
+                    onClick = {
+                        viewModel.exportUnitsBackup { intent ->
+                            context.startActivity(Intent.createChooser(intent, "خروجی واحدها"))
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text("خروجی JSON واحدها") }
+                SpacerH(8)
+                OutlinedButton(
+                    onClick = {
+                        restoreTarget = RestoreTarget.UNITS
+                        importLauncher.launch(arrayOf("application/json", "*/*"))
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text("بازیابی واحدها از JSON") }
                 SpacerH(8)
                 OutlinedButton(
                     onClick = {
@@ -180,7 +241,7 @@ fun SettingsScreen(
         item {
             SectionCard(title = "درباره برنامه") {
                 InfoRow("نام", "پیش‌فایل (Pish File)")
-                InfoRow("نسخه", "۰.۲.۰")
+                InfoRow("نسخه", Formatters.toPersianDigits(BuildConfig.VERSION_NAME))
                 InfoRow("کاربرد", "مدیریت و بایگانی فایل‌های پیش‌فروش مسکونی، تجاری و سهامی جهت ارائه به مشتریان و متقاضیان خرید")
                 SoftDivider()
                 Text(
@@ -192,3 +253,6 @@ fun SettingsScreen(
         }
     }
 }
+
+/** هدف بازیابی — برای تشخیص کدام بخش از فایل JSON بازیابی شود */
+private enum class RestoreTarget { FULL, PROJECTS, UNITS }

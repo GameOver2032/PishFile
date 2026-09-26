@@ -75,6 +75,27 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: ثبت خطاهای کامپایل به‌عنوان Annotation
+        if: failure()
+        run: |
+          {
+            grep -E "^e: " "$RUNNER_TEMP/gradle.log" 2>/dev/null | head -40 | while IFS= read -r line; do
+              stripped=$(printf '%s' "$line" | sed 's|^e: ||')
+              file=$(printf '%s' "$stripped" | sed -nE 's|^file://(.*\.(kt|java)):.*|\1|p')
+              msg=$(printf '%s' "$stripped" | sed -nE 's|^file://[^ )]*: \(([0-9]+), ([0-9]+)\): (.*)$|\1:\2: \3|p')
+              [ -z "$msg" ] && msg=${stripped}
+              if [ -n "$file" ]; then
+                rel=${file#*PishFile/}
+                echo "::error file=${rel}::${msg}"
+              else
+                echo "::error::${msg}"
+              fi
+            done
+            grep -E "^> Task .*FAILED|^FAILURE:|^What went wrong" "$RUNNER_TEMP/gradle.log" 2>/dev/null | head -10 | while IFS= read -r line; do
+              echo "::error::${line}"
+            done
+          } || true
+
       - name: آپلود APK به‌عنوان Artifact
         if: success()
         uses: actions/upload-artifact@v4

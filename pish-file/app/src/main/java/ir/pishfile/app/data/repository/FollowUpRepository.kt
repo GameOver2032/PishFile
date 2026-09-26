@@ -11,6 +11,7 @@ class FollowUpRepository(private val dao: FollowUpDao) {
     fun observePending(): Flow<List<FollowUpEntity>> = dao.observePending()
     fun observeDueToday(): Flow<List<FollowUpEntity>> = dao.observeDueToday(Formatters.todayJalali())
     fun observeByPreFile(preFileId: String): Flow<List<FollowUpEntity>> = dao.observeByPreFile(preFileId)
+    fun observeByCustomer(customerId: String): Flow<List<FollowUpEntity>> = dao.observeByCustomer(customerId)
 
     suspend fun getById(id: String): FollowUpEntity? = dao.getById(id)
     suspend fun getAll(): List<FollowUpEntity> = dao.getAll()

@@ -5,8 +5,12 @@ import android.content.Intent
 import android.net.Uri
 import androidx.core.content.FileProvider
 import ir.pishfile.app.data.local.PishFileDatabase
+import ir.pishfile.app.data.local.entity.CustomerEntity
 import ir.pishfile.app.data.local.entity.FollowUpEntity
+import ir.pishfile.app.data.local.entity.NoteEntity
+import ir.pishfile.app.data.local.entity.AttachmentEntity
 import ir.pishfile.app.data.local.entity.PreFileEntity
+import ir.pishfile.app.data.local.entity.ProjectAreaEntity
 import ir.pishfile.app.data.local.entity.ProjectEntity
 import ir.pishfile.app.data.local.entity.UnitEntity
 import org.json.JSONArray
@@ -28,13 +32,17 @@ class BackupManager(
     suspend fun exportFullBackup(): File {
         val root = JSONObject()
         root.put("app", "PishFile")
-        root.put("version", 2)
+        root.put("version", 5)
         root.put("exportedAt", System.currentTimeMillis())
 
         root.put("projects", JSONArray(database.projectDao().getAll().map { projectToJson(it) }))
         root.put("units", JSONArray(database.unitDao().getAll().map { unitToJson(it) }))
         root.put("preFiles", JSONArray(database.preFileDao().getAll().map { preFileToJson(it) }))
         root.put("followUps", JSONArray(database.followUpDao().getAll().map { followUpToJson(it) }))
+        root.put("customers", JSONArray(database.customerDao().getAll().map { customerToJson(it) }))
+        root.put("notes", JSONArray(database.noteDao().getAll().map { noteToJson(it) }))
+        root.put("projectAreas", JSONArray(database.projectAreaDao().getAll().map { projectAreaToJson(it) }))
+        root.put("attachments", JSONArray(database.attachmentDao().getAll().map { attachmentToJson(it) }))
 
         val file = File(exportDir(), "pishfile-backup-${timestamp()}.json")
         file.writeText(root.toString(2), Charsets.UTF_8)
@@ -74,7 +82,7 @@ class BackupManager(
                     (p.bonusAmount ?: 0).toString(),
                     (p.pricePerMeter ?: 0).toString(),
                     (p.meterArea ?: 0.0).toString(),
-                    p.computedTotal.toString(),
+                    p.displayPrice.toString(),
                     if (p.hasRanking) p.ranking.orEmpty() else "",
                     p.saleConditionsSummary,
                     (p.installmentCount ?: 0).toString(),
@@ -99,6 +107,8 @@ class BackupManager(
         var units = 0
         var preFiles = 0
         var followUps = 0
+        var customers = 0
+        var notes = 0
 
         root.optJSONArray("projects")?.let { array ->
             for (i in 0 until array.length()) {
@@ -124,8 +134,90 @@ class BackupManager(
                 followUps++
             }
         }
+        root.optJSONArray("customers")?.let { array ->
+            for (i in 0 until array.length()) {
+                database.customerDao().insert(jsonToCustomer(array.getJSONObject(i)))
+                customers++
+            }
+        }
+        root.optJSONArray("notes")?.let { array ->
+            for (i in 0 until array.length()) {
+                database.noteDao().insert(jsonToNote(array.getJSONObject(i)))
+                notes++
+            }
+        }
+        root.optJSONArray("projectAreas")?.let { array ->
+            for (i in 0 until array.length()) {
+                database.projectAreaDao().insert(jsonToProjectArea(array.getJSONObject(i)))
+            }
+        }
+        root.optJSONArray("attachments")?.let { array ->
+            for (i in 0 until array.length()) {
+                database.attachmentDao().insert(jsonToAttachment(array.getJSONObject(i)))
+            }
+        }
 
-        return ImportSummary(projects, units, preFiles, followUps)
+        return ImportSummary(projects, units, preFiles, followUps, customers, notes)
+    }
+
+    /** خروجی مجزا از پروژه‌ها (به همراه متراژهایشان) */
+    suspend fun exportProjectsBackup(): File {
+        val root = JSONObject()
+        root.put("app", "PishFile")
+        root.put("version", 5)
+        root.put("section", "projects")
+        root.put("exportedAt", System.currentTimeMillis())
+        root.put("projects", JSONArray(database.projectDao().getAll().map { projectToJson(it) }))
+        root.put("projectAreas", JSONArray(database.projectAreaDao().getAll().map { projectAreaToJson(it) }))
+        val file = File(exportDir(), "pishfile-projects-${timestamp()}.json")
+        file.writeText(root.toString(2), Charsets.UTF_8)
+        return file
+    }
+
+    /** خروجی مجزا از واحدها */
+    suspend fun exportUnitsBackup(): File {
+        val root = JSONObject()
+        root.put("app", "PishFile")
+        root.put("version", 5)
+        root.put("section", "units")
+        root.put("exportedAt", System.currentTimeMillis())
+        root.put("units", JSONArray(database.unitDao().getAll().map { unitToJson(it) }))
+        val file = File(exportDir(), "pishfile-units-${timestamp()}.json")
+        file.writeText(root.toString(2), Charsets.UTF_8)
+        return file
+    }
+
+    /** بازیابی مجزای پروژه‌ها (با متراژها) — به‌روزرسانی/افزودن بر اساس شناسه */
+    suspend fun importProjectsBackup(json: String): Pair<Int, Int> {
+        val root = JSONObject(json)
+        var projects = 0
+        root.optJSONArray("projects")?.let { array ->
+            for (i in 0 until array.length()) {
+                database.projectDao().insert(jsonToProject(array.getJSONObject(i)))
+                projects++
+            }
+        }
+        var areas = 0
+        root.optJSONArray("projectAreas")?.let { array ->
+            for (i in 0 until array.length()) {
+                database.projectAreaDao().insert(jsonToProjectArea(array.getJSONObject(i)))
+                areas++
+            }
+        }
+        return projects to areas
+    }
+
+    /** بازیابی مجزای واحدها — به‌روزرسانی/افزودن بر اساس شناسه */
+    suspend fun importUnitsBackup(json: String): Int {
+        val root = JSONObject(json)
+        var units = 0
+        root.optJSONArray("units")?.let { array ->
+            for (i in 0 until array.length()) {
+                database.unitDao().insert(jsonToUnit(array.getJSONObject(i)))
+                units++
+            }
+        }
+        return units
     }
 
     data class ImportSummary(
@@ -133,8 +225,10 @@ class BackupManager(
         val units: Int,
         val preFiles: Int,
         val followUps: Int,
+        val customers: Int,
+        val notes: Int,
     ) {
-        val total: Int get() = projects + units + preFiles + followUps
+        val total: Int get() = projects + units + preFiles + followUps + customers + notes
     }
 
     fun shareFile(file: File, mimeType: String = "application/octet-stream"): Intent {
@@ -163,6 +257,13 @@ class BackupManager(
         put("address", p.address)
         put("salePricePerMeter", p.salePricePerMeter); put("defaultDepositAmount", p.defaultDepositAmount)
         put("shareMeterArea", p.shareMeterArea); put("sharePrice", p.sharePrice)
+        put("defaultBonusAmount", p.defaultBonusAmount)
+        put("hasRanking", p.hasRanking); put("defaultRanking", p.defaultRanking)
+        put("saleConditionCash", p.saleConditionCash); put("saleConditionInstallment", p.saleConditionInstallment)
+        put("saleConditionExchange", p.saleConditionExchange); put("saleConditionNotes", p.saleConditionNotes)
+        put("installmentCount", p.installmentCount); put("remainingInstallmentsCount", p.remainingInstallmentsCount)
+        put("installmentAmount", p.installmentAmount); put("installmentPeriod", p.installmentPeriod)
+        put("nextInstallmentDueDate", p.nextInstallmentDueDate)
         put("phase", p.phase); put("progressPercent", p.progressPercent)
         put("deliveryDate", p.deliveryDate); put("facilities", p.facilities); put("description", p.description)
         put("createdAt", p.createdAt); put("updatedAt", p.updatedAt)
@@ -201,8 +302,22 @@ class BackupManager(
         put("title", f.title); put("description", f.description); put("outcome", f.outcome)
         put("preFileId", f.preFileId); put("projectId", f.projectId)
         put("dueDate", f.dueDate); put("dueTime", f.dueTime); put("status", f.status)
-        put("contactPhone", f.contactPhone)
+        put("contactPhone", f.contactPhone); put("customerId", f.customerId)
         put("createdAt", f.createdAt); put("updatedAt", f.updatedAt)
+    }
+
+    private fun customerToJson(c: CustomerEntity) = JSONObject().apply {
+        put("id", c.id); put("name", c.name); put("phone", c.phone)
+        put("role", c.role); put("preFileId", c.preFileId); put("unitId", c.unitId)
+        put("notes", c.notes); put("status", c.status)
+        put("createdAt", c.createdAt); put("updatedAt", c.updatedAt)
+    }
+
+    private fun noteToJson(n: NoteEntity) = JSONObject().apply {
+        put("id", n.id); put("preFileId", n.preFileId); put("customerId", n.customerId)
+        put("type", n.type); put("text", n.text); put("outcome", n.outcome)
+        put("noteDate", n.noteDate)
+        put("createdAt", n.createdAt); put("updatedAt", n.updatedAt)
     }
 
     private fun JSONObject.text(key: String): String? =
@@ -225,6 +340,18 @@ class BackupManager(
         defaultDepositAmount = o.long("defaultDepositAmount"),
         shareMeterArea = o.double("shareMeterArea"),
         sharePrice = o.long("sharePrice"),
+        defaultBonusAmount = o.long("defaultBonusAmount"),
+        hasRanking = o.optBoolean("hasRanking", false),
+        defaultRanking = o.text("defaultRanking"),
+        saleConditionCash = o.optBoolean("saleConditionCash", true),
+        saleConditionInstallment = o.optBoolean("saleConditionInstallment", false),
+        saleConditionExchange = o.optBoolean("saleConditionExchange", false),
+        saleConditionNotes = o.text("saleConditionNotes"),
+        installmentCount = o.int("installmentCount"),
+        remainingInstallmentsCount = o.int("remainingInstallmentsCount"),
+        installmentAmount = o.long("installmentAmount"),
+        installmentPeriod = o.text("installmentPeriod"),
+        nextInstallmentDueDate = o.text("nextInstallmentDueDate"),
         phase = o.optString("phase", "PLANNING"),
         progressPercent = o.optInt("progressPercent", 0),
         deliveryDate = o.text("deliveryDate"),
@@ -300,7 +427,84 @@ class BackupManager(
         dueTime = o.text("dueTime"),
         status = o.optString("status", "PENDING"),
         contactPhone = o.text("contactPhone"),
+        customerId = o.text("customerId"),
         createdAt = o.optLong("createdAt", System.currentTimeMillis()),
         updatedAt = o.optLong("updatedAt", System.currentTimeMillis()),
     )
+
+    private fun jsonToCustomer(o: JSONObject) = CustomerEntity(
+        id = o.getString("id"),
+        name = o.getString("name"),
+        phone = o.text("phone"),
+        role = o.optString("role", "BUYER"),
+        preFileId = o.text("preFileId"),
+        unitId = o.text("unitId"),
+        notes = o.text("notes"),
+        status = o.optString("status", "ACTIVE"),
+        createdAt = o.optLong("createdAt", System.currentTimeMillis()),
+        updatedAt = o.optLong("updatedAt", System.currentTimeMillis()),
+    )
+
+    private fun jsonToNote(o: JSONObject) = NoteEntity(
+        id = o.getString("id"),
+        preFileId = o.text("preFileId"),
+        customerId = o.text("customerId"),
+        type = o.optString("type", "CALL"),
+        text = o.getString("text"),
+        outcome = o.text("outcome"),
+        noteDate = o.optString("noteDate", Formatters.todayJalali()),
+        createdAt = o.optLong("createdAt", System.currentTimeMillis()),
+        updatedAt = o.optLong("updatedAt", System.currentTimeMillis()),
+    )
+
+    private fun projectAreaToJson(a: ProjectAreaEntity) = JSONObject().apply {
+        put("id", a.id)
+        put("projectId", a.projectId)
+        put("label", a.label)
+        a.areaValue?.let { put("areaValue", it) }
+        a.totalPrice?.let { put("totalPrice", it) }
+        a.depositAmount?.let { put("depositAmount", it) }
+        a.bonusAmount?.let { put("bonusAmount", it) }
+        a.installmentCount?.let { put("installmentCount", it) }
+        a.installmentAmount?.let { put("installmentAmount", it) }
+        a.installmentPeriod?.let { put("installmentPeriod", it) }
+        put("sortIndex", a.sortIndex)
+    }
+
+    private fun jsonToProjectArea(o: JSONObject) = ProjectAreaEntity(
+        id = o.getString("id"),
+        projectId = o.getString("projectId"),
+        label = o.getString("label"),
+        areaValue = o.double("areaValue"),
+        totalPrice = o.long("totalPrice"),
+        depositAmount = o.long("depositAmount"),
+        bonusAmount = o.long("bonusAmount"),
+        installmentCount = o.int("installmentCount"),
+        installmentAmount = o.long("installmentAmount"),
+        installmentPeriod = o.text("installmentPeriod"),
+        sortIndex = o.optInt("sortIndex"),
+    )
+
+    private fun attachmentToJson(a: AttachmentEntity) = JSONObject().apply {
+        put("id", a.id)
+        put("ownerType", a.ownerType)
+        put("ownerId", a.ownerId)
+        put("displayName", a.displayName)
+        put("mimeType", a.mimeType)
+        put("uri", a.uri)
+        a.sizeBytes?.let { put("sizeBytes", it) }
+        put("createdAt", a.createdAt)
+    }
+
+    private fun jsonToAttachment(o: JSONObject) = AttachmentEntity(
+        id = o.getString("id"),
+        ownerType = o.getString("ownerType"),
+        ownerId = o.getString("ownerId"),
+        displayName = o.getString("displayName"),
+        mimeType = o.optString("mimeType", "application/octet-stream"),
+        uri = o.getString("uri"),
+        sizeBytes = o.long("sizeBytes"),
+        createdAt = o.optLong("createdAt", System.currentTimeMillis()),
+    )
+
 }

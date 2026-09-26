@@ -89,6 +89,19 @@ object Formatters {
     /** درصد */
     fun percent(value: Int?): String = if (value == null) "—" else "${toPersianDigits(value.toString())}٪"
 
+    /** نمایش اندازه‌ی فایل به‌صورت خوانا (مثلاً «۲.۴ مگابایت») */
+    fun bytesToSize(bytes: Long): String {
+        val units = listOf("بایت", "کیلوبایت", "مگابایت", "گігаبایت")
+        var value = bytes.toDouble()
+        var unit = 0
+        while (value >= 1024 && unit < units.lastIndex) {
+            value /= 1024
+            unit++
+        }
+        val text = if (value >= 100) value.toLong().toString() else String.format("%.1f", value)
+        return "${toPersianDigits(text)} ${units[unit]}"
+    }
+
     // ---------- تاریخ شمسی (تبدیل بدون وابستگی خارجی) ----------
 
     /** تبدیل میلادی به شمسی (الگوریتم استاندارد با حساب صحیح) */

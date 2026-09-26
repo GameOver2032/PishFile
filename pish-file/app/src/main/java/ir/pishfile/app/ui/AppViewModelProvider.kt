@@ -6,11 +6,16 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import ir.pishfile.app.PishFileApp
 import ir.pishfile.app.di.AppContainer
-import ir.pishfile.app.ui.viewmodel.DashboardViewModel
+import ir.pishfile.app.ui.viewmodel.CustomerDetailViewModel
+import ir.pishfile.app.ui.viewmodel.CustomerEditViewModel
+import ir.pishfile.app.ui.viewmodel.CustomerListViewModel
+import ir.pishfile.app.ui.viewmodel.FastViewModel
 import ir.pishfile.app.ui.viewmodel.FollowUpsViewModel
+import ir.pishfile.app.ui.viewmodel.QuickPickViewModel
 import ir.pishfile.app.ui.viewmodel.PreFileDetailViewModel
 import ir.pishfile.app.ui.viewmodel.PreFileEditViewModel
 import ir.pishfile.app.ui.viewmodel.PreFileListViewModel
+import ir.pishfile.app.ui.viewmodel.PreFileWizardViewModel
 import ir.pishfile.app.ui.viewmodel.ProjectDetailViewModel
 import ir.pishfile.app.ui.viewmodel.ProjectEditViewModel
 import ir.pishfile.app.ui.viewmodel.ProjectListViewModel
@@ -21,20 +26,14 @@ import ir.pishfile.app.ui.viewmodel.UnitListViewModel
 
 object AppViewModelProvider {
     val Factory = viewModelFactory {
-        initializer {
-            DashboardViewModel(
-                container().preFileRepository,
-                container().unitRepository,
-                container().followUpRepository,
-            )
-        }
         initializer { ProjectListViewModel(container().projectRepository) }
-        initializer { ProjectEditViewModel(container().projectRepository) }
+        initializer { ProjectEditViewModel(container().projectRepository, container().projectAreaRepository) }
         initializer {
             ProjectDetailViewModel(
                 container().projectRepository,
                 container().unitRepository,
                 container().preFileRepository,
+                container().projectAreaRepository,
             )
         }
 
@@ -45,6 +44,7 @@ object AppViewModelProvider {
                 container().unitRepository,
                 container().projectRepository,
                 container().preFileRepository,
+                container().attachmentRepository,
             )
         }
 
@@ -54,6 +54,15 @@ object AppViewModelProvider {
                 container().preFileRepository,
                 container().projectRepository,
                 container().unitRepository,
+                container().projectAreaRepository,
+            )
+        }
+        initializer {
+            PreFileWizardViewModel(
+                container().preFileRepository,
+                container().projectRepository,
+                container().unitRepository,
+                container().projectAreaRepository,
             )
         }
         initializer {
@@ -61,6 +70,9 @@ object AppViewModelProvider {
                 container().preFileRepository,
                 container().unitRepository,
                 container().followUpRepository,
+                container().customerRepository,
+                container().noteRepository,
+                container().attachmentRepository,
             )
         }
 
@@ -68,6 +80,48 @@ object AppViewModelProvider {
             FollowUpsViewModel(
                 container().followUpRepository,
                 container().preFileRepository,
+                container().customerRepository,
+                container().noteRepository,
+                container().reminderScheduler,
+            )
+        }
+        initializer {
+            FastViewModel(
+                container().preFileRepository,
+                container().customerRepository,
+                container().followUpRepository,
+                container().noteRepository,
+                container().reminderScheduler,
+            )
+        }
+        initializer {
+            QuickPickViewModel(
+                container().unitRepository,
+                container().preFileRepository,
+                container().projectRepository,
+            )
+        }
+        initializer {
+            CustomerListViewModel(
+                container().customerRepository,
+                container().preFileRepository,
+            )
+        }
+        initializer {
+            CustomerEditViewModel(
+                container().customerRepository,
+                container().preFileRepository,
+                container().unitRepository,
+            )
+        }
+        initializer {
+            CustomerDetailViewModel(
+                container().customerRepository,
+                container().preFileRepository,
+                container().unitRepository,
+                container().followUpRepository,
+                container().noteRepository,
+                container().reminderScheduler,
             )
         }
         initializer {
