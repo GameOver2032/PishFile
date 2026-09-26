@@ -339,20 +339,20 @@ fun ProjectEditScreen(
                         }
                         SpacerH(8)
                         Text(
-                            "پروژه‌های سهامی ممکن است واریزی و امتیاز هم داشته باشند:",
+                            "پروژه‌های سهامی ممکن است واریزی و امتیاز هم داشته باشند — این مبالغ به ازای هر سهم است:",
                             style = MaterialTheme.typography.bodySmall,
                         )
                         SpacerH(6)
                         MoneyField(
                             value = form.defaultDepositAmount,
                             onValueChange = { v -> viewModel.update { it.copy(defaultDepositAmount = v) } },
-                            label = "مبلغ واریزی پروژه (اختیاری)",
+                            label = "مبلغ واریزی هر سهم (اختیاری)",
                         )
                         SpacerH(8)
                         MoneyField(
                             value = form.defaultBonusAmount,
                             onValueChange = { v -> viewModel.update { it.copy(defaultBonusAmount = v) } },
-                            label = "مبلغ امتیاز (اختیاری)",
+                            label = "مبلغ امتیاز هر سهم (اختیاری)",
                         )
                         SpacerH(8)
                         MoneyField(
@@ -618,10 +618,10 @@ fun ProjectDetailScreen(
                         InfoRow("مدل فروش", "سهامی")
                         InfoRow("متراژ هر سهم", current.shareMeterArea?.let { "${Formatters.number(it.toInt())} م²" })
                         InfoRow("قیمت هر سهم", Formatters.amountWithUnit(current.sharePrice), emphasize = true)
-                        InfoRow("واریزی پروژه", Formatters.amountWithUnit(current.defaultDepositAmount))
-                        InfoRow("مبلغ امتیاز", Formatters.amountWithUnit(current.defaultBonusAmount))
+                        InfoRow("واریزی هر سهم", Formatters.amountWithUnit(current.defaultDepositAmount))
+                        InfoRow("امتیاز هر سهم", Formatters.amountWithUnit(current.defaultBonusAmount))
                         InfoRow("قیمت حدودی کل", Formatters.amountWithUnit(current.approxTotalPrice), emphasize = true)
-                        InfoRow("مجموع واریزی + امتیاز", formatters_sum(current.defaultDepositAmount, current.defaultBonusAmount), emphasize = true)
+                        InfoRow("مجموع واریزی + امتیاز (هر سهم)", formatters_sum(current.defaultDepositAmount, current.defaultBonusAmount), emphasize = true)
                     }
                     else -> {
                         InfoRow("مدل فروش", "قیمت متری")

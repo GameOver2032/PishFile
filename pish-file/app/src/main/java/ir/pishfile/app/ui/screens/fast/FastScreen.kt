@@ -138,7 +138,7 @@ fun FastScreen(
             GameButton(
                 emoji = "📄",
                 title = "فایل جدید",
-                subtitle = "ثبت سریع یک فایل پیش‌فروش",
+                subtitle = "ثبت سریع فایل جدید (واحد آماده یا پیش‌فروش)",
                 gradient = listOf(Color(0xFF1B5E20), Color(0xFF43A047)),
                 onClick = onNewFile,
             )

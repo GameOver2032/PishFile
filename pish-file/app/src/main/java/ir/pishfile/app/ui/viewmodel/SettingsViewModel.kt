@@ -1,10 +1,10 @@
 package ir.pishfile.app.ui.viewmodel
 
 import android.content.Intent
-import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import ir.pishfile.app.core.BackupManager
+import ir.pishfile.app.core.Formatters
 import ir.pishfile.app.data.local.PishFileDatabase
 import ir.pishfile.app.data.repository.SettingsRepository
 import ir.pishfile.app.data.sync.PendingSyncSummary
@@ -94,14 +94,63 @@ class SettingsViewModel(
         }
     }
 
-    fun importBackup(uri: Uri) {
+    fun importBackup(json: String) {
         viewModelScope.launch {
             try {
-                // پیاده‌سازی ساده بازیابی
-                _message.value = "فایل بازیابی پردازش شد"
+                val summary = withContext(Dispatchers.IO) { backupManager.importFullBackup(json) }
+                _message.value = "بازیابی کامل شد: ${Formatters.toPersianDigits(summary.total)} رکورد"
                 refreshPending()
             } catch (e: Exception) {
                 _message.value = "خطا در بازیابی: ${e.message}"
+            }
+        }
+    }
+
+    fun exportProjectsBackup(onReady: (Intent) -> Unit) {
+        viewModelScope.launch {
+            try {
+                val file = withContext(Dispatchers.IO) { backupManager.exportProjectsBackup() }
+                onReady(backupManager.shareFile(file, "application/json"))
+                _message.value = "خروجی JSON پروژه‌ها ساخته شد"
+            } catch (e: Exception) {
+                _message.value = "خطا در خروجی: ${e.message}"
+            }
+        }
+    }
+
+    fun importProjectsBackup(json: String) {
+        viewModelScope.launch {
+            try {
+                val (projects, areas) = withContext(Dispatchers.IO) { backupManager.importProjectsBackup(json) }
+                _message.value = "بازیابی پروژه‌ها: ${Formatters.toPersianDigits(projects)} پروژه، " +
+                    "${Formatters.toPersianDigits(areas)} متراژ"
+                refreshPending()
+            } catch (e: Exception) {
+                _message.value = "خطا در بازیابی پروژه‌ها: ${e.message}"
+            }
+        }
+    }
+
+    fun exportUnitsBackup(onReady: (Intent) -> Unit) {
+        viewModelScope.launch {
+            try {
+                val file = withContext(Dispatchers.IO) { backupManager.exportUnitsBackup() }
+                onReady(backupManager.shareFile(file, "application/json"))
+                _message.value = "خروجی JSON واحدها ساخته شد"
+            } catch (e: Exception) {
+                _message.value = "خطا در خروجی: ${e.message}"
+            }
+        }
+    }
+
+    fun importUnitsBackup(json: String) {
+        viewModelScope.launch {
+            try {
+                val units = withContext(Dispatchers.IO) { backupManager.importUnitsBackup(json) }
+                _message.value = "بازیابی واحدها: ${Formatters.toPersianDigits(units)} واحد"
+                refreshPending()
+            } catch (e: Exception) {
+                _message.value = "خطا در بازیابی واحدها: ${e.message}"
             }
         }
     }

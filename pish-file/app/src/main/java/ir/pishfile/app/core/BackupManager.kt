@@ -160,6 +160,66 @@ class BackupManager(
         return ImportSummary(projects, units, preFiles, followUps, customers, notes)
     }
 
+    /** خروجی مجزا از پروژه‌ها (به همراه متراژهایشان) */
+    suspend fun exportProjectsBackup(): File {
+        val root = JSONObject()
+        root.put("app", "PishFile")
+        root.put("version", 5)
+        root.put("section", "projects")
+        root.put("exportedAt", System.currentTimeMillis())
+        root.put("projects", JSONArray(database.projectDao().getAll().map { projectToJson(it) }))
+        root.put("projectAreas", JSONArray(database.projectAreaDao().getAll().map { projectAreaToJson(it) }))
+        val file = File(exportDir(), "pishfile-projects-${timestamp()}.json")
+        file.writeText(root.toString(2), Charsets.UTF_8)
+        return file
+    }
+
+    /** خروجی مجزا از واحدها */
+    suspend fun exportUnitsBackup(): File {
+        val root = JSONObject()
+        root.put("app", "PishFile")
+        root.put("version", 5)
+        root.put("section", "units")
+        root.put("exportedAt", System.currentTimeMillis())
+        root.put("units", JSONArray(database.unitDao().getAll().map { unitToJson(it) }))
+        val file = File(exportDir(), "pishfile-units-${timestamp()}.json")
+        file.writeText(root.toString(2), Charsets.UTF_8)
+        return file
+    }
+
+    /** بازیابی مجزای پروژه‌ها (با متراژها) — به‌روزرسانی/افزودن بر اساس شناسه */
+    suspend fun importProjectsBackup(json: String): Pair<Int, Int> {
+        val root = JSONObject(json)
+        var projects = 0
+        root.optJSONArray("projects")?.let { array ->
+            for (i in 0 until array.length()) {
+                database.projectDao().insert(jsonToProject(array.getJSONObject(i)))
+                projects++
+            }
+        }
+        var areas = 0
+        root.optJSONArray("projectAreas")?.let { array ->
+            for (i in 0 until array.length()) {
+                database.projectAreaDao().insert(jsonToProjectArea(array.getJSONObject(i)))
+                areas++
+            }
+        }
+        return projects to areas
+    }
+
+    /** بازیابی مجزای واحدها — به‌روزرسانی/افزودن بر اساس شناسه */
+    suspend fun importUnitsBackup(json: String): Int {
+        val root = JSONObject(json)
+        var units = 0
+        root.optJSONArray("units")?.let { array ->
+            for (i in 0 until array.length()) {
+                database.unitDao().insert(jsonToUnit(array.getJSONObject(i)))
+                units++
+            }
+        }
+        return units
+    }
+
     data class ImportSummary(
         val projects: Int,
         val units: Int,

@@ -94,7 +94,7 @@ fun PreFileListScreen(
                 query = it
                 viewModel.setQuery(it)
             },
-            placeholder = "جست‌وجوی پیش‌فروش: شماره فایل، مالک، پروژه، واحد…",
+            placeholder = "جست‌وجوی فایل: شماره فایل، مالک، پروژه، واحد…",
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
         )
 
@@ -110,8 +110,8 @@ fun PreFileListScreen(
 
         if (preFiles.isEmpty()) {
             EmptyState(
-                title = "فایل پیش‌فروشی ثبت نشده",
-                subtitle = "با دکمه + یک فایل پیش‌فروش جدید اضافه کنید",
+                title = "فایلی ثبت نشده",
+                subtitle = "با دکمه + یک فایل جدید (واحد آماده یا پیش‌فروش) اضافه کنید",
                 icon = { Icon(Icons.Filled.Description, contentDescription = null) },
             )
         } else {
@@ -132,7 +132,7 @@ fun PreFileListScreen(
 
     pendingDelete?.let { preFile ->
         ConfirmDialog(
-            title = "حذف فایل پیش‌فروش",
+            title = if (preFile.fileType == Constants.FILE_TYPE_READY) "حذف فایل" else "حذف فایل پیش‌فروش",
             message = "فایل ${preFile.draftNumber} حذف شود؟",
             onConfirm = { viewModel.delete(preFile.id) },
             onDismiss = { pendingDelete = null },
@@ -273,7 +273,7 @@ fun PreFileEditScreen(
     ) {
         item {
             GameHeader(
-                title = if (preFileId == null) "ثبت فایل پیش‌فروش" else "ویرایش فایل",
+                title = if (preFileId == null) "ثبت فایل" else "ویرایش فایل",
                 emoji = "📄",
                 subtitle = "فرم کامل ثبت / ویرایش فایل",
             )
@@ -587,7 +587,7 @@ fun PreFileEditScreen(
         item {
             SectionCard(title = "وضعیت فایل و تحویل") {
                 DropdownField(
-                    label = "وضعیت پیش‌فروش",
+                    label = if (form.fileType == Constants.FILE_TYPE_READY) "وضعیت فروش" else "وضعیت پیش‌فروش",
                     options = Constants.preFileStatuses.map { Constants.preFileStatusLabel(it) },
                     selected = Constants.preFileStatusLabel(form.status),
                     onSelect = { label ->
@@ -617,7 +617,7 @@ fun PreFileEditScreen(
             Button(
                 onClick = { viewModel.save { id -> onSaved(id) } },
                 modifier = Modifier.fillMaxWidth(),
-            ) { Text(if (preFileId == null) "ثبت فایل پیش‌فروش" else "ذخیره تغییرات") }
+            ) { Text(if (preFileId == null) "ثبت فایل" else "ذخیره تغییرات") }
         }
         item {
             OutlinedButton(onClick = onBack, modifier = Modifier.fillMaxWidth()) { Text("انصراف") }
@@ -876,7 +876,11 @@ fun PreFileDetailScreen(
         item {
             SectionCard(
                 title = "پیوست‌ها",
-                subtitle = "فایل، عکس و ویدیوی مرتبط با این فایل پیش‌فروش",
+                subtitle = if (pf.fileType == Constants.FILE_TYPE_READY) {
+                    "فایل، عکس و ویدیوی مرتبط با این فایل"
+                } else {
+                    "فایل، عکس و ویدیوی مرتبط با این فایل پیش‌فروش"
+                },
             ) {
                 AttachmentSection(
                     ownerType = Constants.ATTACH_PREFILE,
@@ -909,7 +913,7 @@ fun PreFileDetailScreen(
 
     if (showDelete) {
         ConfirmDialog(
-            title = "حذف فایل پیش‌فروش",
+            title = if (pf.fileType == Constants.FILE_TYPE_READY) "حذف فایل" else "حذف فایل پیش‌فروش",
             message = "فایل ${pf.draftNumber} حذف شود؟",
             onConfirm = { viewModel.delete(onBack) },
             onDismiss = { showDelete = false },

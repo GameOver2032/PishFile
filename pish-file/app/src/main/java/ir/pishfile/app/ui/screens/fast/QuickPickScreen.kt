@@ -71,7 +71,8 @@ fun QuickPickScreen(
 
     val statusAllowed = when (mode) {
         QuickPickMode.READY_UNIT -> { unit: UnitEntity -> unit.status == Constants.UNIT_AVAILABLE }
-        else -> { _: UnitEntity -> true }
+        QuickPickMode.PRESALE -> { unit: UnitEntity -> unit.status == Constants.UNIT_RESERVED }
+        QuickPickMode.CUSTOMER -> { _: UnitEntity -> true }
     }
     val visibleUnits = (if (q.isBlank()) units else units.filter {
         it.displayTitle.contains(q, true) || projectById[it.projectId]?.name?.contains(q, true) == true
@@ -105,7 +106,7 @@ fun QuickPickScreen(
             },
             subtitle = when (mode) {
                 QuickPickMode.READY_UNIT -> "یک واحد آماده انتخاب کن — شرایط پروژه‌اش خودکار پر می‌شود"
-                QuickPickMode.PRESALE -> "اول واحد را انتخاب کن — شرایط پروژه‌اش خودکار پر می‌شود"
+                QuickPickMode.PRESALE -> "یک واحد پیش‌فروشی انتخاب کن — شرایط پروژه‌اش خودکار پر می‌شود"
                 QuickPickMode.CUSTOMER -> "مشتری برای کدام واحد یا فایل پیش‌فروش است؟"
             },
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),

@@ -7,7 +7,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Apartment
 import androidx.compose.material3.Button
@@ -111,6 +113,7 @@ fun PreFileWizardScreen(
     Column(
         Modifier
             .fillMaxSize()
+            .verticalScroll(rememberScrollState())
             .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
@@ -236,7 +239,13 @@ fun PreFileWizardScreen(
             Button(
                 onClick = { viewModel.next { id -> onSaved(id) } },
                 modifier = Modifier.weight(if (optional) 1f else 2f),
-            ) { Text(if (isLast) "ثبت فایل پیش‌فروش" else "بعدی") }
+            ) {
+                Text(
+                    if (isLast) {
+                        if (form.fileType == Constants.FILE_TYPE_READY) "ثبت فایل" else "ثبت فایل پیش‌فروش"
+                    } else "بعدی"
+                )
+            }
         }
 
         OutlinedButton(onClick = onBack, modifier = Modifier.fillMaxWidth()) { Text("انصراف") }
@@ -594,7 +603,7 @@ private fun WizardStepInstallment(viewModel: PreFileWizardViewModel, form: PreFi
 @Composable
 private fun WizardStepStatus(viewModel: PreFileWizardViewModel, form: PreFileForm) {
     DropdownField(
-        label = "وضعیت پیش‌فروش",
+        label = if (form.fileType == Constants.FILE_TYPE_READY) "وضعیت فروش" else "وضعیت پیش‌فروش",
         options = Constants.preFileStatuses.map { Constants.preFileStatusLabel(it) },
         selected = Constants.preFileStatusLabel(form.status),
         onSelect = { label ->

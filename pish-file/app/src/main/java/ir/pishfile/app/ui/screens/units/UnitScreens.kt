@@ -429,9 +429,9 @@ fun UnitDetailScreen(
         }
 
         item {
-            SectionCard(title = "فایل‌های پیش‌فروش این واحد (${Formatters.number(preFiles.size)})") {
+            SectionCard(title = "فایل‌های فروش این واحد (${Formatters.number(preFiles.size)})") {
                 if (preFiles.isEmpty()) {
-                    Text("فایل پیش‌فروشی برای این واحد ثبت نشده", style = MaterialTheme.typography.bodySmall)
+                    Text("فایلی برای این واحد ثبت نشده", style = MaterialTheme.typography.bodySmall)
                 } else {
                     preFiles.forEach { row ->
                         Card(
@@ -455,7 +455,7 @@ fun UnitDetailScreen(
                 }
                 SpacerH(10)
                 Button(onClick = onNewPreFile, modifier = Modifier.fillMaxWidth()) {
-                    Text("ثبت پیش‌فروش برای این واحد")
+                    Text("ثبت فایل فروش برای این واحد")
                 }
             }
         }
